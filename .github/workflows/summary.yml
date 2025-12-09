@@ -32,6 +32,8 @@ jobs:
  
       - name: Release for Windows
         run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload release artifacts
         if: startsWith(github.ref, 'refs/tags/')
