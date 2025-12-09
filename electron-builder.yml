@@ -47,5 +47,6 @@ publish:
   repo: bluetools
   vPrefixedTagName: true
   releaseType: release
+  publishAuto: false  # 关键：禁用打包时的自动发布 避免与github actions冲突
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

@@ -29,7 +29,7 @@ function createWindow() {
       enableRemoteModule: false
     }
   })
-  
+
   // 添加调试日志，检查 preload 脚本路径是否正确
   console.log('Preload script path:', join(__dirname, '../preload/index.js'))
   console.log('Preload script exists:', fs.existsSync(join(__dirname, '../preload/index.js')))
@@ -39,7 +39,7 @@ function createWindow() {
     mainWindow.setTitle('蓝牙测试工具')
     mainWindow.show()
   })
-  
+
   // 保留ready-to-show事件作为备用
   mainWindow.on('ready-to-show', () => {
     // 只有在页面加载完成后才显示窗口
@@ -161,16 +161,18 @@ function setupAutoUpdater() {
       mainWindow.webContents.send('update-downloaded', info)
     }
     // 询问用户是否立即安装更新
-    dialog.showMessageBox({
-      type: 'info',
-      title: '更新完成',
-      message: '新版本已下载完成，是否立即安装并重启应用？',
-      buttons: ['立即安装', '稍后安装']
-    }).then((result) => {
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall()
-      }
-    })
+    dialog
+      .showMessageBox({
+        type: 'info',
+        title: '更新完成',
+        message: '新版本已下载完成，是否立即安装并重启应用？',
+        buttons: ['立即安装', '稍后安装']
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall()
+        }
+      })
   })
 
   // 监听更新错误

@@ -11,7 +11,12 @@ const api = {
     }
   },
   on: (channel, func) => {
-    const validChannels = ['update-available', 'download-progress', 'update-downloaded', 'update-error']
+    const validChannels = [
+      'update-available',
+      'download-progress',
+      'update-downloaded',
+      'update-error'
+    ]
     if (validChannels.includes(channel)) {
       // Deliberately strip event as it includes `sender`
       ipcRenderer.on(channel, (event, ...args) => func(...args))

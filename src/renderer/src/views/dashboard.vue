@@ -2,6 +2,7 @@
 const noble = require('@abandonware/noble')
 import { ref, reactive, onMounted, toRaw, onBeforeUnmount } from 'vue'
 import { Delete, Refresh, Pointer } from '@element-plus/icons-vue'
+import jsQR from 'jsqr'
 // 窗口控制函数
 const handleWin = (action) => {
   // 在Electron环境中，这里应该调用主进程的窗口控制API
@@ -126,20 +127,31 @@ const state = ref('')
 const stateTimer = ref(null)
 const timer = ref(null)
 const isScanning = ref(false)
+// 蓝牙适配器状态
+const bluetoothState = ref('')
 
 // 初始化蓝牙
 const initBluetooth = () => {
   noble.on('stateChange', function (state) {
+    bluetoothState.value = state
     if (state === 'poweredOn') {
       console.log('蓝牙适配器已开启...')
-    } else {
-      alert('蓝牙未开启，请打开蓝牙')
     }
   })
 }
 
+// 检查蓝牙状态
+const checkBluetoothState = () => {
+  if (bluetoothState.value !== 'poweredOn') {
+    alert('蓝牙未开启，请打开蓝牙')
+    return false
+  }
+  return true
+}
+
 // 扫描设备
 const scan = async () => {
+  if (!checkBluetoothState()) return
   state.value = '扫描中'
   isScanning.value = true
   stateTimer.value && clearInterval(stateTimer.value)
@@ -221,8 +233,10 @@ const addDeviceToQueue = (device) => {
   }
 }
 
-// 组件挂载时初始化蓝牙
-initBluetooth()
+onMounted(() => {
+  // 组件挂载时初始化蓝牙
+  initBluetooth()
+})
 
 // 测试完成状态
 const testCompleted = ref(false)
@@ -261,7 +275,7 @@ const startTest = async () => {
     alert('请先添加设备到录入队列')
     return
   }
-  
+  if (!checkBluetoothState()) return
   // 重置测试完成状态
   testCompleted.value = false
   
@@ -598,10 +612,10 @@ const handleBarcodeInput = () => {
 // 处理扫码枪输入完成（Enter键）
 const handleBarcodeEnter = () => {
   // 检查是否有未完成的测试
-  if (devices.length > 0 && !testCompleted.value) {
-    alert('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
-    return
-  }
+  // if (devices.length > 0 && !testCompleted.value) {
+  //   alert('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
+  //   return
+  // }
   
   if (barcodeInput.value.trim()) {
     const barcode = barcodeInput.value.trim()
@@ -643,8 +657,104 @@ const handleBarcodeEnter = () => {
 
 // 摄像头相关数据
 const cameraVideo = ref(null)
+const qrCanvas = ref(null)
 const isCameraActive = ref(false)
 let mediaStream = null
+let qrDetectionInterval = null
+
+// 二维码检测
+const detectQRCode = () => {
+  if (!cameraVideo.value || !qrCanvas.value || !isCameraActive.value) return
+  
+  const canvas = qrCanvas.value
+  const context = canvas.getContext('2d')
+  
+  // 设置canvas尺寸与video一致
+  canvas.width = cameraVideo.value.videoWidth
+  canvas.height = cameraVideo.value.videoHeight
+  
+  // 绘制视频帧到canvas
+  context.drawImage(cameraVideo.value, 0, 0, canvas.width, canvas.height)
+  
+  // 获取图像数据
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+  
+  // 检测二维码
+  const code = jsQR(imageData.data, imageData.width, imageData.height, {
+    inversionAttempts: 'dontInvert',
+  })
+  
+  if (code) {
+    // 停止检测
+    if (qrDetectionInterval) {
+      clearInterval(qrDetectionInterval)
+      qrDetectionInterval = null
+    }
+    
+    // 解析二维码内容
+    parseQRCodeContent(code.data)
+  }
+}
+
+// 解析二维码内容
+const parseQRCodeContent = (content) => {
+  console.log('扫描到二维码:', content)
+  
+  // 检查是否有未完成的测试
+  if (testStarted.value) {
+    alert('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
+    // 关闭摄像头
+    startCamera()
+    return
+  }
+  
+  // 验证二维码格式：ecv02ec308e52b393,C001202511181700,861606086013598
+  // 格式要求：以ecv02开头，包含蓝牙头、设备mac、产品编号、imei，用逗号分隔
+  const qrPattern = /^ecv02([0-9a-fA-F]{12}),([A-Z0-9]+),([0-9]+)$/
+  const match = content.match(qrPattern)
+  
+  if (match) {
+    // 提取信息
+    const bluetoothHeader = 'ecv02'
+    const deviceMac = match[1]
+    const productId = match[2]
+    const imei = match[3]
+    
+    console.log('解析成功:', {
+      bluetoothHeader,
+      deviceMac,
+      productId,
+      imei
+    })
+    
+    // 创建设备对象
+    const device = {
+      id: deviceMac, // 使用mac地址作为设备ID
+      name: `Device_${productId}`,
+      mac: deviceMac,
+      connected: false,
+      rssi: -60 // 默认RSSI值
+    }
+    
+    // 添加设备到队列
+    addDeviceToQueue(device)
+    
+    // 关闭摄像头
+    startCamera()
+    
+    // 提示成功
+    alert(`设备录入成功！\n产品编号：${productId}\nMAC地址：${deviceMac}`)
+  } else {
+    // 格式不符合要求
+    console.error('二维码格式不正确')
+    alert('二维码格式不正确，请扫描正确的设备二维码。\n\n正确格式示例：ecv02ec308e52b393,C001202511181700,861606086013598')
+    
+    // 继续检测
+    if (!qrDetectionInterval && isCameraActive.value) {
+      qrDetectionInterval = setInterval(detectQRCode, 300)
+    }
+  }
+}
 
 // 开启/关闭摄像头
 const startCamera = async () => {
@@ -657,6 +767,13 @@ const startCamera = async () => {
         })
         mediaStream = null
       }
+      
+      // 停止二维码检测
+      if (qrDetectionInterval) {
+        clearInterval(qrDetectionInterval)
+        qrDetectionInterval = null
+      }
+      
       isCameraActive.value = false
       console.log('摄像头已关闭')
     } else {
@@ -676,7 +793,9 @@ const startCamera = async () => {
         console.log('摄像头已开启')
         
         // 启动二维码检测
-        // detectQRCode()
+        if (!qrDetectionInterval) {
+          qrDetectionInterval = setInterval(detectQRCode, 300)
+        }
       }
     }
   } catch (error) {
@@ -693,6 +812,13 @@ const cleanupCamera = () => {
     })
     mediaStream = null
   }
+  
+  // 停止二维码检测
+  if (qrDetectionInterval) {
+    clearInterval(qrDetectionInterval)
+    qrDetectionInterval = null
+  }
+  
   isCameraActive.value = false
 }
 
@@ -925,6 +1051,7 @@ const clearSettings = () => {
                     <div
                       class=" mt-2 relative z-10 w-64 h-64 border-2 border-blue-500/50 rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(59,130,246,0.2)]">
                       <video ref="cameraVideo" class="w-full h-full object-cover opacity-100" autoplay></video>
+                      <canvas ref="qrCanvas" class="absolute top-0 left-0 w-full h-full opacity-0"></canvas>
                       <!-- 扫描线动画 -->
                       <div v-if="isCameraActive" class="absolute left-0 w-full h-0.5 bg-blue-400 shadow-[0_0_10px_#60a5fa] scan-line"></div>
                       <div class="absolute inset-0 border-[30px] border-black/30"></div>
