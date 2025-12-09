@@ -1,0 +1,17 @@
+{
+  "name": "bluetools",
+  "version": "1.0.0",
+  "description": "An Electron application with Vue",
+  "main": "./out/main/index.js",
+  "author": "example.com",
+  "homepage": "https://electron-vite.org",
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-25",
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "electron-updater": "^6.1.7",
+    "element-plus": "^2.8.8",
+    "vue-router": "^4.4.5",
+    "ws": "^8.18.0"
+  }
+}

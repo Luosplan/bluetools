@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluetooth Pro Test Tool - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6;
+        }
+        body { background-color: var(--bg-body); color: #f8fafc; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+        }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        /* 信号波纹动画 */
+        .ping-slow { animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+
+        /* 步骤条流动光效 */
+        .step-active { color: #60a5fa; text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-slate-900">
+    <div id="app" class="h-full flex flex-col p-6">
+        
+        <!-- 顶部控制栏 -->
+        <header class="h-16 glass-panel rounded-2xl flex items-center justify-between px-6 mb-6 shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
+                    <i class="ri-flask-line text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-semibold text-white">自动化测试看板</h1>
+                    <p class="text-xs text-slate-400">待测设备: <span class="text-white font-mono">{{ devices.length }}</span> 台</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button @click="startAll" :disabled="isTesting" class="px-5 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-green-600/20">
+                    <i class="ri-play-circle-line text-lg"></i> 全部开始
+                </button>
+            </div>
+        </header>
+
+        <!-- 设备卡片网格 -->
+        <main class="flex-1 overflow-y-auto pr-2 pb-10">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                
+                <div v-for="dev in devices" :key="dev.id" 
+                     class="glass-panel rounded-2xl p-0 flex flex-col overflow-hidden transition-all duration-300 group border-l-4"
+                     :class="getCardBorderClass(dev.status)">
+                    
+                    <!-- 卡片头部：设备基础信息 -->
+                    <div class="p-5 border-b border-white/5 bg-white/5 flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg relative"
+                                 :class="getStatusIconClass(dev.status)">
+                                <i :class="getStatusIcon(dev.status)"></i>
+                                <!-- 扫描时的波纹动画 -->
+                                <div v-if="dev.status === 'scanning'" class="absolute inset-0 rounded-full border border-blue-400 ping-slow"></div>
+                            </div>
+                            <div>
+                                <div class="font-medium text-white">{{ dev.name }}</div>
+                                <div class="text-xs text-slate-400 code-font">MAC: {{ dev.targetMac }}</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
+                                {{ getStatusText(dev.status) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 核心内容区域 (高度固定，避免抖动) -->
+                    <div class="h-64 relative bg-slate-900/30">
+                        
+                        <!-- 场景 A: 待机/准备中 -->
+                        <div v-if="dev.status === 'idle'" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                            <i class="ri-bluetooth-connect-line text-4xl mb-2 opacity-30"></i>
+                            <span class="text-sm">等待开始测试</span>
+                            <button @click="startTest(dev)" class="mt-4 px-4 py-1.5 border border-slate-600 rounded hover:bg-white/5 hover:text-white transition text-xs">
+                                单独开始
+                            </button>
+                        </div>
+
+                        <!-- 场景 B: 连接过程可视 (Steps) -->
+                        <div v-else-if="['scanning', 'connecting', 'services', 'characteristics'].includes(dev.status)" 
+                             class="absolute inset-0 p-6 flex flex-col justify-center">
+                            <div class="space-y-4">
+                                <!-- 步骤条 -->
+                                <div v-for="(step, idx) in connectionSteps" :key="idx" class="flex items-center gap-3 opacity-40 transition-all duration-300"
+                                     :class="{'opacity-100 step-active font-medium': isStepActive(dev.status, step.key), 'text-green-500 opacity-60': isStepDone(dev.status, step.key)}">
+                                    <div class="w-2 h-2 rounded-full" 
+                                         :class="isStepActive(dev.status, step.key) ? 'bg-blue-400 animate-pulse' : (isStepDone(dev.status, step.key) ? 'bg-green-500' : 'bg-slate-600')"></div>
+                                    <span class="text-sm">{{ step.label }}</span>
+                                    <i v-if="isStepDone(dev.status, step.key)" class="ri-check-line ml-auto"></i>
+                                    <i v-else-if="isStepActive(dev.status, step.key)" class="ri-loader-4-line animate-spin ml-auto"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 场景 C: 测试完成/数据展示 (Dashboard) -->
+                        <div v-else-if="dev.status === 'done' || dev.status === 'reading'" class="absolute inset-0 p-4">
+                            <div class="h-full grid grid-cols-2 gap-3">
+                                <!-- 数据格 1: 产品编号 -->
+                                <div class="bg-slate-800/60 rounded-lg p-3 border border-white/5 flex flex-col justify-between">
+                                    <span class="text-[10px] text-slate-500 uppercase tracking-wider">Product ID</span>
+                                    <span class="text-sm text-white code-font break-all">{{ dev.data.productId || '--' }}</span>
+                                </div>
+                                <!-- 数据格 2: 读取到的MAC -->
+                                <div class="bg-slate-800/60 rounded-lg p-3 border border-white/5 flex flex-col justify-between">
+                                    <span class="text-[10px] text-slate-500 uppercase tracking-wider">Device MAC</span>
+                                    <span class="text-xs text-white code-font">{{ dev.data.readMac || '--' }}</span>
+                                </div>
+                                
+                                <!-- 核心传感器数据 -->
+                                <div class="bg-blue-500/10 rounded-lg p-3 border border-blue-500/20 flex flex-col justify-between">
+                                    <div class="flex items-center gap-1 text-blue-400">
+                                        <i class="ri-temp-hot-line"></i> <span class="text-[10px] uppercase">温度</span>
+                                    </div>
+                                    <span class="text-xl font-medium text-blue-100">{{ dev.data.temp }}<small class="text-xs text-blue-400 ml-1">°C</small></span>
+                                </div>
+
+                                <div class="bg-purple-500/10 rounded-lg p-3 border border-purple-500/20 flex flex-col justify-between">
+                                    <div class="flex items-center gap-1 text-purple-400">
+                                        <i class="ri-dashboard-3-line"></i> <span class="text-[10px] uppercase">压力</span>
+                                    </div>
+                                    <span class="text-xl font-medium text-purple-100">{{ dev.data.pressure }}<small class="text-xs text-purple-400 ml-1">Pa</small></span>
+                                </div>
+
+                                <div class="bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20 flex flex-col justify-between">
+                                    <div class="flex items-center gap-1 text-emerald-400">
+                                        <i class="ri-windy-line"></i> <span class="text-[10px] uppercase">流量</span>
+                                    </div>
+                                    <span class="text-xl font-medium text-emerald-100">{{ dev.data.flow }}<small class="text-xs text-emerald-400 ml-1">L/m</small></span>
+                                </div>
+
+                                <div class="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20 flex flex-col justify-between">
+                                    <div class="flex items-center gap-1 text-orange-400">
+                                        <i class="ri-flashlight-line"></i> <span class="text-[10px] uppercase">电压</span>
+                                    </div>
+                                    <span class="text-xl font-medium text-orange-100">{{ dev.data.voltage }}<small class="text-xs text-orange-400 ml-1">V</small></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 场景 D: 错误 -->
+                        <div v-else-if="dev.status === 'error'" class="absolute inset-0 flex flex-col items-center justify-center text-red-400">
+                            <i class="ri-error-warning-line text-4xl mb-2"></i>
+                            <span class="text-sm font-medium">连接超时</span>
+                            <button @click="startTest(dev)" class="mt-4 text-xs underline hover:text-red-300">重试</button>
+                        </div>
+                    </div>
+
+                    <!-- 底部 Logs 简略 -->
+                    <div class="h-8 bg-black/40 border-t border-white/5 px-4 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-500 code-font truncate max-w-[200px]">
+                            <span class="text-blue-500" v-if="dev.logs.length">></span> {{ dev.logs[dev.logs.length-1] || 'Ready' }}
+                        </span>
+                        <div class="text-[10px] text-slate-600">RSSI: {{ dev.rssi || '--' }}</div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue;
+
+        createApp({
+            setup() {
+                const isTesting = ref(false);
+
+                // 定义连接步骤，用于显示进度
+                const connectionSteps = [
+                    { key: 'scanning', label: '正在查找设备蓝牙...' },
+                    { key: 'connecting', label: '正在建立连接...' },
+                    { key: 'services', label: '获取设备服务(Services)...' },
+                    { key: 'characteristics', label: '解析特征值(Characteristics)...' }
+                ];
+
+                // 模拟数据源
+                const devices = ref([
+                    { id: 1, name: 'Pressure_Sensor_01', targetMac: 'AA:BB:CC:11:22:33', status: 'idle', rssi: -70, logs: [], data: {} },
+                    { id: 2, name: 'Flow_Meter_X', targetMac: 'DD:EE:FF:44:55:66', status: 'idle', rssi: null, logs: [], data: {} },
+                    { id: 3, name: 'Volt_Check_Pro', targetMac: '12:34:56:78:90:AB', status: 'idle', rssi: null, logs: [], data: {} },
+                ]);
+
+                // 核心逻辑：模拟完整的蓝牙测试流程
+                const startTest = async (dev) => {
+                    // 重置状态
+                    dev.status = 'scanning';
+                    dev.logs = [];
+                    dev.data = {};
+                    addLog(dev, '开始测试流程');
+
+                    try {
+                        // 1. 查找设备
+                        await mockDelay(1500); 
+                        dev.rssi = -Math.floor(Math.random() * 40 + 50);
+                        addLog(dev, `发现设备 RSSI: ${dev.rssi}`);
+                        
+                        // 2. 连接蓝牙
+                        dev.status = 'connecting';
+                        await mockDelay(1500);
+                        addLog(dev, '已连接到设备');
+
+                        // 3. 获取服务
+                        dev.status = 'services';
+                        await mockDelay(1000);
+                        addLog(dev, 'Service UUIDs 获取成功');
+
+                        // 4. 获取特征值
+                        dev.status = 'characteristics';
+                        await mockDelay(1000);
+                        addLog(dev, 'Characteristic Ready');
+
+                        // 5. 开始读取数据
+                        dev.status = 'reading';
+                        addLog(dev, '发送读取指令: CMD_READ_ALL');
+                        await mockDelay(800);
+
+                        // 6. 填充数据
+                        dev.data = {
+                            productId: 'SN-' + Math.floor(Math.random()*100000),
+                            readMac: dev.targetMac,
+                            temp: (Math.random() * 10 + 25).toFixed(1), // 25-35度
+                            pressure: (Math.random() * 50 + 100).toFixed(0),
+                            flow: (Math.random() * 5).toFixed(2),
+                            voltage: (Math.random() * 2 + 3).toFixed(2) // 3-5V
+                        };
+                        
+                        dev.status = 'done';
+                        addLog(dev, '测试完成，数据已校验');
+
+                    } catch (e) {
+                        dev.status = 'error';
+                        addLog(dev, 'Error: ' + e.message);
+                    }
+                };
+
+                const startAll = () => {
+                    isTesting.value = true;
+                    devices.value.forEach((dev, index) => {
+                        // 错峰启动，看起来更真实
+                        setTimeout(() => {
+                            if(dev.status === 'idle' || dev.status === 'done' || dev.status === 'error') {
+                                startTest(dev);
+                            }
+                        }, index * 500);
+                    });
+                    setTimeout(() => { isTesting.value = false; }, 6000);
+                };
+
+                // 工具函数
+                const mockDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                const addLog = (dev, msg) => {
+                    const time = new Date().toLocaleTimeString('en-US', {hour12:false});
+                    dev.logs.push(`[${time}] ${msg}`);
+                };
+
+                // 样式辅助函数
+                const getCardBorderClass = (status) => {
+                    switch(status) {
+                        case 'idle': return 'border-l-slate-600';
+                        case 'scanning': return 'border-l-blue-500';
+                        case 'connecting': return 'border-l-yellow-500';
+                        case 'done': return 'border-l-green-500';
+                        case 'error': return 'border-l-red-500';
+                        default: return 'border-l-blue-400';
+                    }
+                };
+
+                const getStatusIconClass = (status) => {
+                    if(status === 'done') return 'bg-green-500/20 text-green-400';
+                    if(status === 'error') return 'bg-red-500/20 text-red-400';
+                    if(status === 'idle') return 'bg-slate-700 text-slate-400';
+                    return 'bg-blue-600 text-white';
+                };
+
+                const getStatusIcon = (status) => {
+                    if(status === 'done') return 'ri-check-line';
+                    if(status === 'error') return 'ri-close-line';
+                    if(status === 'idle') return 'ri-pause-line';
+                    return 'ri-bluetooth-line';
+                };
+
+                const getStatusText = (status) => {
+                    const map = {
+                        'idle': '待机',
+                        'scanning': '扫描中...',
+                        'connecting': '连接中...',
+                        'services': '获取服务...',
+                        'characteristics': '解析特征...',
+                        'reading': '读取数据...',
+                        'done': '测试通过',
+                        'error': '连接失败'
+                    };
+                    return map[status] || status;
+                };
+
+                // 步骤条逻辑
+                const stepOrder = ['scanning', 'connecting', 'services', 'characteristics', 'done'];
+                const isStepActive = (currentStatus, stepKey) => currentStatus === stepKey;
+                const isStepDone = (currentStatus, stepKey) => {
+                    const currentIdx = stepOrder.indexOf(currentStatus);
+                    const stepIdx = stepOrder.indexOf(stepKey);
+                    // 如果当前状态是 'reading' 或 'done'，则前面所有步骤都算完成
+                    if (currentStatus === 'reading' || currentStatus === 'done') return true;
+                    return currentIdx > stepIdx;
+                };
+
+                return {
+                    devices,
+                    startTest,
+                    startAll,
+                    isTesting,
+                    connectionSteps,
+                    isStepActive,
+                    isStepDone,
+                    getCardBorderClass,
+                    getStatusIconClass,
+                    getStatusIcon,
+                    getStatusText
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

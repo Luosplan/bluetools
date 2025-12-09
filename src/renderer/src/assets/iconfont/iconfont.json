@@ -1,0 +1,58 @@
+{
+  "id": "5083009",
+  "name": "祎智量芯蓝牙测试工具",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "12119723",
+      "name": "ri-camera-lens-line",
+      "font_class": "ri-camera-lens-line",
+      "unicode": "eb9c",
+      "unicode_decimal": 60316
+    },
+    {
+      "icon_id": "40808751",
+      "name": "ri-radar-line",
+      "font_class": "ri-radar-line",
+      "unicode": "e804",
+      "unicode_decimal": 59396
+    },
+    {
+      "icon_id": "40809610",
+      "name": "ri-barcode-box-line",
+      "font_class": "ri-barcode-box-line",
+      "unicode": "e99b",
+      "unicode_decimal": 59803
+    },
+    {
+      "icon_id": "14538869",
+      "name": "bluetooth_line",
+      "font_class": "bluetooth-line",
+      "unicode": "e6c8",
+      "unicode_decimal": 59080
+    },
+    {
+      "icon_id": "248981",
+      "name": "scan",
+      "font_class": "scan",
+      "unicode": "e69a",
+      "unicode_decimal": 59034
+    },
+    {
+      "icon_id": "8106221",
+      "name": "settings",
+      "font_class": "settings",
+      "unicode": "e699",
+      "unicode_decimal": 59033
+    },
+    {
+      "icon_id": "42230753",
+      "name": "flask-line",
+      "font_class": "flask-line",
+      "unicode": "e812",
+      "unicode_decimal": 59410
+    }
+  ]
+}
