@@ -43,7 +43,7 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: your-github-username
+  owner: Luosplan  # 请替换为你的GitHub用户名
   repo: bluetools
   vPrefixedTagName: true
   releaseType: release
