@@ -128,11 +128,37 @@ git push --tags
 ## 自动更新配置
 
 ### 配置文件
-- `electron-builder.yml`：配置发布参数
+
+#### 1. `dev-app-update.yml`（开发环境配置）
+开发环境下的自动更新测试配置：
+
+- **`provider`**：更新源提供者（generic，通用HTTP服务器）
+- **`url`**：更新包下载地址（示例地址，开发环境使用）
+- **`updaterCacheDirName`**：更新缓存目录名称（bluetools-updater）
+
+此文件仅用于开发环境测试自动更新功能，生产环境更新配置由 `electron-builder.yml` 中的 `publish` 配置决定。
+
+#### 2. `electron-builder.yml`（生产环境配置）
+生产环境的构建和发布配置：
+
+- **基础配置**：
+  - `appId`：应用唯一标识符（com.electron.app）
+  - `productName`：应用名称（bluetools）
+  - `directories.buildResources`：构建资源目录（build）
+  - `files`：打包时包含/排除的文件规则
+  - `asarUnpack`：不打包进asar的资源文件（resources/**）
+
+- **平台特定配置**：
+  - **Windows**：可执行文件名、图标、NSIS安装程序配置
+  - **macOS**：图标、权限配置、DMG打包配置
+  - **Linux**：支持AppImage、snap、deb格式打包
+
+- **发布配置**：
   - `publish.provider`：发布提供者（GitHub）
-  - `publish.owner`：GitHub 用户名
-  - `publish.repo`：GitHub 仓库名
+  - `publish.owner`：GitHub 用户名（Luosplan）
+  - `publish.repo`：GitHub 仓库名（bluetools）
   - `publish.vPrefixedTagName`：使用带 v 前缀的标签名
+  - `publish.publishAutoUpdate`：禁用打包时自动发布，避免与GitHub Actions冲突
 
 ### 更新流程
 1. 应用启动时检查更新
@@ -153,6 +179,29 @@ npm install
 
 ### 开发环境
 
+#### 环境搭建
+
+##### 1. 基础环境要求
+- **Node.js**：推荐使用 LTS 版本，要求 Node.js 18.x 或更高版本
+- **Python**：Python 2.7 或 Python 3.x
+- **Visual Studio**：Windows 平台需要安装 Visual Studio（包含 C++ 构建工具）
+
+##### 2. 蓝牙开发环境配置
+```bash
+# 全局安装 node-gyp（用于编译原生模块）
+npm install -g node-gyp
+
+# 设置 npm 的 Python 路径（替换为你的实际 Python 路径）
+npm config set python D:\env\python\python.exe
+
+# 安装项目依赖
+npm install
+
+# 安装蓝牙库 @abandonware/noble
+npm install @abandonware/noble
+```
+
+##### 3. 启动开发服务器
 ```bash
 npm run dev
 ```
@@ -175,6 +224,60 @@ npm run build:linux
 # 构建并生成未打包的应用目录
 npm run build:unpack
 ```
+
+### 打包文件说明
+
+构建完成后，打包文件会生成在项目根目录的 `dist` 文件夹中。不同平台的打包产物类型如下：
+
+#### Windows 平台
+- **安装程序**：`dist/bluetools-<version>-setup.exe`
+  - 使用 NSIS 制作的安装程序
+  - 支持自定义安装目录
+  - 自动创建桌面快捷方式
+  - 包含完整的应用文件和依赖
+- **未打包应用目录**：`dist/win-unpacked/`
+  - 未打包的应用程序目录
+  - 包含所有应用文件和依赖
+  - 可直接运行，无需安装
+- **安装程序块映射文件**：`dist/bluetools-<version>-setup.exe.blockmap`
+  - 用于 `electron-updater` 的增量更新
+  - 包含文件差异信息，减小更新包大小
+
+#### macOS 平台
+- **DMG 镜像**：`dist/bluetools-<version>.dmg`
+  - 包含应用程序的磁盘镜像
+  - 支持拖放安装
+  - 已签名和公证配置
+
+#### Linux 平台
+- **AppImage**：`dist/bluetools-<version>.AppImage`
+  - 便携格式，无需安装
+  - 支持大多数 Linux 发行版
+- **Snap 包**：`dist/bluetools-<version>.snap`
+  - Ubuntu 生态系统的打包格式
+- **Deb 包**：`dist/bluetools-<version>.deb`
+  - Debian/Ubuntu 系统的安装包
+
+#### 通用辅助文件
+- **图标文件**：`dist/.icon-ico`
+  - 应用程序图标资源
+  - 用于安装程序和应用窗口
+- **构建调试配置**：`dist/builder-debug.yml`
+  - 构建过程中的调试信息
+  - 包含构建命令、环境变量等
+- **构建有效配置**：`dist/builder-effective-config.yml`
+  - 合并后的最终构建配置
+  - 包含默认配置和自定义配置的组合
+- **更新元数据**：`dist/latest.yml`
+  - 用于 `electron-updater` 的更新检查
+  - 包含当前版本信息、下载地址等
+  - 每个平台有对应的更新元数据文件（如 `latest.yml`、`latest-mac.yml` 等）
+
+#### 通用说明
+- **版本号**：打包文件中包含当前应用版本号（如 v1.0.0）
+- **签名**：macOS 平台支持应用签名和公证（可在 `electron-builder.yml` 中配置）
+- **自动更新**：Windows 和 macOS 版本支持从 GitHub Releases 自动更新
+- **依赖**：所有平台的打包产物均包含完整的应用依赖，无需额外安装
 
 ## 技术栈
 
