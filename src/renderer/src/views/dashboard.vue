@@ -19,14 +19,40 @@ const updateStatus = ref({
   info: null
 })
 
+// 应用版本号
+const appVersion = ref('1.0.1')
+
 // 检查更新
 const checkForUpdates = () => {
   updateStatus.value.checking = true
   updateStatus.value.error = null
   updateStatus.value.progress = 0 // 开始检查更新时进度归零
+  
+  // 设置超时机制，防止无限期检查
+  const updateTimeout = setTimeout(() => {
+    if (updateStatus.value.checking) {
+      console.error('更新检查超时')
+      updateStatus.value.checking = false
+      updateStatus.value.error = '检查更新超时，请稍后重试'
+      alert('检查更新超时，请稍后重试')
+    }
+  }, 10000) // 10秒超时
+  
   if (window.ipcRenderer) {
+    console.log('检查更新');
     window.ipcRenderer.send('check-for-updates')
+    
+    // 清除其他事件中的超时
+    const clearTimeoutIfNeeded = () => {
+      clearTimeout(updateTimeout)
+    }
+    
+    // 监听更新相关事件，清除超时
+    window.ipcRenderer.once('update-available', clearTimeoutIfNeeded)
+    window.ipcRenderer.once('update-not-available', clearTimeoutIfNeeded)
+    window.ipcRenderer.once('update-error', clearTimeoutIfNeeded)
   } else {
+    clearTimeout(updateTimeout)
     updateStatus.value.checking = false
     updateStatus.value.error = '更新功能不可用'
   }
@@ -74,6 +100,11 @@ if (window.ipcRenderer) {
     updateStatus.value.checking = false
     // 使用 alert 提示用户暂无新版本
     alert('暂无新版本')
+  })
+
+  // 监听主进程发送的版本号
+  window.ipcRenderer.on('app-version', (event, data) => {
+    appVersion.value = data.version
   })
 }
 
@@ -1498,7 +1529,7 @@ const clearSettings = () => {
                   <div class="flex items-center justify-between">
                     <div>
                       <div class="text-sm font-medium text-white">Bluetooth Pro Test Tool</div>
-                      <div class="text-xs text-slate-500">Version 2.1.0 (Build 20231027)</div>
+                      <div class="text-xs text-slate-500">Version {{ appVersion }} (Build 20231027)</div>
                     </div>
                     <div class="flex gap-2">
                       <button 

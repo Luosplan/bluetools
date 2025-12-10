@@ -94,6 +94,8 @@ function createWindow() {
         }, 2000)
       }
     } else {
+      // 生产环境中实际调用检查更新
+      console.log('生产环境：开始检查更新')
       autoUpdater.checkForUpdates()
     }
   })
@@ -134,12 +136,44 @@ function createWindow() {
 // 配置自动更新
 function setupAutoUpdater() {
   // 设置自动更新的日志
-  autoUpdater.logger = console
+  autoUpdater.logger = {
+    log: (message) => {
+      console.log('[autoUpdater]', message)
+    },
+    info: (message) => {
+      console.log('[autoUpdater] INFO:', message)
+    },
+    warn: (message) => {
+      console.warn('[autoUpdater] WARN:', message)
+    },
+    error: (message) => {
+      console.error('[autoUpdater] ERROR:', message)
+    }
+  }
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
+  // 打印初始配置信息
+  console.log('[autoUpdater] 初始化完成，当前版本:', app.getVersion())
+  console.log('[autoUpdater] 更新服务器配置:', {
+    provider: 'github',
+    owner: 'Luosplan',
+    repo: 'bluetools',
+    vPrefixedTagName: true
+  })
+
+  // 监听更新检查开始
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[autoUpdater] 正在检查更新...')
+    const mainWindow = BrowserWindow.getAllWindows()[0]
+    if (mainWindow) {
+      mainWindow.webContents.send('checking-for-update')
+    }
+  })
+
   // 监听更新检查结果
   autoUpdater.on('update-available', (info) => {
+    console.log('[autoUpdater] 发现新版本:', info.version)
     const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.webContents.send('update-available', info)
@@ -148,6 +182,7 @@ function setupAutoUpdater() {
 
   // 监听更新下载进度
   autoUpdater.on('download-progress', (progress) => {
+    console.log('[autoUpdater] 下载进度:', Math.round(progress.percent) + '%')
     const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.webContents.send('download-progress', progress)
@@ -156,6 +191,7 @@ function setupAutoUpdater() {
 
   // 监听更新下载完成
   autoUpdater.on('update-downloaded', (info) => {
+    console.log('[autoUpdater] 更新下载完成:', info.version)
     const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded', info)
@@ -177,15 +213,16 @@ function setupAutoUpdater() {
 
   // 监听更新错误
   autoUpdater.on('error', (error) => {
+    console.error('[autoUpdater] 更新错误:', error)
     const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.webContents.send('update-error', error)
     }
-    console.error('更新错误:', error)
   })
 
   // 监听没有更新的情况
   autoUpdater.on('update-not-available', (info) => {
+    console.log('[autoUpdater] 没有可用更新')
     const mainWindow = BrowserWindow.getAllWindows()[0]
     if (mainWindow) {
       mainWindow.webContents.send('update-not-available', info)
@@ -205,6 +242,13 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+    // 向渲染进程发送版本号
+    const packageJson = require('../../package.json')
+    window.webContents.on('did-finish-load', () => {
+      window.webContents.send('app-version', {
+        version: packageJson.version
+      })
+    })
   })
 
   createWindow()
