@@ -104,6 +104,12 @@ git tag v1.0.0
 
 # 创建带注释的标签（推荐）
 git tag -a v1.0.0 -m "版本1.0.0发布"
+
+# 删除本地标签
+git tag -d v1.0.0
+
+# 删除远程标签
+git push origin --delete v1.0.0
 ```
 
 ### 推送标签
