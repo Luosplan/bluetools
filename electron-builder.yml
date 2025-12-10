@@ -47,6 +47,7 @@ publish:
   repo: bluetools
   vPrefixedTagName: true
   releaseType: release
-  publishAutoUpdate: false  # 关键：禁用打包时的自动发布 避免与github actions冲突
+  # publishAutoUpdate: false  # 关闭后无法生成 latest.yml
+  publishAutoUpdate: true  # 需要开启配置
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

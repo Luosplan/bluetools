@@ -19,6 +19,13 @@ const updateStatus = ref({
   info: null
 })
 
+// 版本信息
+const appVersion = ref('1.0.0')
+const buildTime = ref('')
+
+// 设置构建时间为当前日期（格式：YYYYMMDD）
+buildTime.value = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+
 // 检查更新
 const checkForUpdates = () => {
   updateStatus.value.checking = true
@@ -74,6 +81,11 @@ if (window.ipcRenderer) {
     updateStatus.value.checking = false
     // 使用 alert 提示用户暂无新版本
     alert('暂无新版本')
+  })
+
+  // 监听应用版本信息
+  window.ipcRenderer.on('app-version', (info) => {
+    appVersion.value = info.version
   })
 }
 
@@ -1497,8 +1509,8 @@ const clearSettings = () => {
                   
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="text-sm font-medium text-white">Bluetooth Pro Test Tool</div>
-                      <div class="text-xs text-slate-500">Version 2.1.0 (Build 20231027)</div>
+                      <div class="text-sm font-medium text-white">Bluetooth Tool</div>
+                      <div class="text-xs text-slate-500">Version {{ appVersion }} (Build {{ buildTime }})</div>
                     </div>
                     <div class="flex gap-2">
                       <button 

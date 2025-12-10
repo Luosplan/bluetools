@@ -164,7 +164,7 @@ git push --tags
   - `publish.owner`：GitHub 用户名（Luosplan）
   - `publish.repo`：GitHub 仓库名（bluetools）
   - `publish.vPrefixedTagName`：使用带 v 前缀的标签名
-  - `publish.publishAutoUpdate`：禁用打包时自动发布，避免与GitHub Actions冲突
+  - `publish.publishAutoUpdate`：禁用打包时自动发布
 
 ### 更新流程
 1. 应用启动时检查更新

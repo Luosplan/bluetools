@@ -15,7 +15,8 @@ const api = {
       'update-available',
       'download-progress',
       'update-downloaded',
-      'update-error'
+      'update-error',
+      'app-version'
     ]
     if (validChannels.includes(channel)) {
       // Deliberately strip event as it includes `sender`

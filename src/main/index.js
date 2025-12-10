@@ -62,6 +62,17 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // 读取package.json获取版本号
+  const packageJson = require('../../package.json')
+  const appVersion = packageJson.version
+
+  // 当页面加载完成后，发送版本号给渲染进程
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.send('app-version', {
+      version: appVersion
+    })
+  })
+
   const eventRouter = new EventRouter()
   eventRouter.addApi('api', app)
   eventRouter.addApi('BrowserWindow', BrowserWindow)
@@ -87,7 +98,7 @@ function createWindow() {
         // 模拟 2 秒后收到更新可用事件
         setTimeout(() => {
           mainWindow.webContents.send('update-available', {
-            version: '1.0.1',
+            version: appVersion,
             releaseNotes: '修复了一些问题，添加了新功能',
             releaseDate: new Date().toISOString()
           })
