@@ -31,9 +31,32 @@ const checkForUpdates = () => {
   updateStatus.value.checking = true
   updateStatus.value.error = null
   updateStatus.value.progress = 0 // 开始检查更新时进度归零
+  
+  // 设置超时机制，防止无限期检查
+  const updateTimeout = setTimeout(() => {
+    if (updateStatus.value.checking) {
+      console.error('更新检查超时')
+      updateStatus.value.checking = false
+      updateStatus.value.error = '检查更新超时，请稍后重试'
+      alert('检查更新超时，请稍后重试')
+    }
+  }, 10000) // 10秒超时
+  
   if (window.ipcRenderer) {
+    console.log('检查更新');
     window.ipcRenderer.send('check-for-updates')
+    
+    // 清除其他事件中的超时
+    const clearTimeoutIfNeeded = () => {
+      clearTimeout(updateTimeout)
+    }
+    
+    // 监听更新相关事件，清除超时
+    window.ipcRenderer.once('update-available', clearTimeoutIfNeeded)
+    window.ipcRenderer.once('update-not-available', clearTimeoutIfNeeded)
+    window.ipcRenderer.once('update-error', clearTimeoutIfNeeded)
   } else {
+    clearTimeout(updateTimeout)
     updateStatus.value.checking = false
     updateStatus.value.error = '更新功能不可用'
   }

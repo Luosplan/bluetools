@@ -2,6 +2,8 @@ node_modules
 package-lock.json
 dist/*
 !dist/latest*.yml
+!dist/*.blockmap
+!dist/*.exe
 out
 .DS_Store
 *.log*
