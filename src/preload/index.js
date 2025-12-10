@@ -16,11 +16,26 @@ const api = {
       'download-progress',
       'update-downloaded',
       'update-error',
-      'app-version'
+      'app-version',
+      'update-not-available'
     ]
     if (validChannels.includes(channel)) {
       // Deliberately strip event as it includes `sender`
       ipcRenderer.on(channel, (event, ...args) => func(...args))
+    }
+  },
+  once: (channel, func) => {
+    const validChannels = [
+      'update-available',
+      'download-progress',
+      'update-downloaded',
+      'update-error',
+      'app-version',
+      'update-not-available'
+    ]
+    if (validChannels.includes(channel)) {
+      // Deliberately strip event as it includes `sender`
+      ipcRenderer.once(channel, (event, ...args) => func(...args))
     }
   }
 }

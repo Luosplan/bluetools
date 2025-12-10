@@ -1,8 +1,8 @@
-version: 1.0.0
+version: 1.0.1
 files:
-  - url: bluetools-1.0.0-setup.exe
-    sha512: qi5FRfPbAS3d8aXNEQRtxYwcTV55SGBvIhhd3attiJMZ1CsaSz5z6M4cRmtvpcKOpd1bbeFed0m7bgKpQ5HwAw==
-    size: 94503203
-path: bluetools-1.0.0-setup.exe
-sha512: qi5FRfPbAS3d8aXNEQRtxYwcTV55SGBvIhhd3attiJMZ1CsaSz5z6M4cRmtvpcKOpd1bbeFed0m7bgKpQ5HwAw==
-releaseDate: '2025-12-10T02:37:53.246Z'
+  - url: bluetools-1.0.1-setup.exe
+    sha512: h6mJ9CfqzVtoRoe1nF6SM4p083XMxyuuLmC7jSvTGuBBTkSzAyD5ccnl0F5qLvhzmKHa2mjbHgX3h/AGXriClw==
+    size: 94504034
+path: bluetools-1.0.1-setup.exe
+sha512: h6mJ9CfqzVtoRoe1nF6SM4p083XMxyuuLmC7jSvTGuBBTkSzAyD5ccnl0F5qLvhzmKHa2mjbHgX3h/AGXriClw==
+releaseDate: '2025-12-10T02:49:04.425Z'

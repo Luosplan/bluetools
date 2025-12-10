@@ -95,12 +95,10 @@ function createWindow() {
       console.log('开发环境：模拟更新检查')
       const mainWindow = BrowserWindow.getAllWindows()[0]
       if (mainWindow) {
-        // 模拟 2 秒后收到更新可用事件
+        // 模拟 2 秒后收到没有可用更新的事件
         setTimeout(() => {
-          mainWindow.webContents.send('update-available', {
-            version: appVersion,
-            releaseNotes: '修复了一些问题，添加了新功能',
-            releaseDate: new Date().toISOString()
+          mainWindow.webContents.send('update-not-available', {
+            version: appVersion
           })
         }, 2000)
       }
