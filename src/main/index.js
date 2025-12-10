@@ -183,6 +183,14 @@ function setupAutoUpdater() {
     }
     console.error('更新错误:', error)
   })
+
+  // 监听没有更新的情况
+  autoUpdater.on('update-not-available', (info) => {
+    const mainWindow = BrowserWindow.getAllWindows()[0]
+    if (mainWindow) {
+      mainWindow.webContents.send('update-not-available', info)
+    }
+  })
 }
 
 // This method will be called when Electron has finished

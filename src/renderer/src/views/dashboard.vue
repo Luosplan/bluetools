@@ -68,6 +68,13 @@ if (window.ipcRenderer) {
     updateStatus.value.progress = 0 // 更新失败时进度归零
     updateStatus.value.error = error.message
   })
+
+  // 监听没有更新的情况
+  window.ipcRenderer.on('update-not-available', (info) => {
+    updateStatus.value.checking = false
+    // 使用 alert 提示用户暂无新版本
+    alert('暂无新版本')
+  })
 }
 
 // 关闭更新提示
