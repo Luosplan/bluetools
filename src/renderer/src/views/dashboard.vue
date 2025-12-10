@@ -83,7 +83,15 @@ if (window.ipcRenderer) {
   })
 
   window.ipcRenderer.on('download-progress', (progress) => {
-    updateStatus.value.progress = Math.round(progress.percent)
+    // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
+    const newProgress = Math.round(progress.percent)
+    if (newProgress > updateStatus.value.progress) {
+      updateStatus.value.progress = newProgress
+    }
+    // 确保进度值不超过100%
+    if (updateStatus.value.progress > 100) {
+      updateStatus.value.progress = 100
+    }
   })
 
   window.ipcRenderer.on('update-downloaded', (info) => {
