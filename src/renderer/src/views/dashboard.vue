@@ -2,13 +2,12 @@
 const noble = require('@abandonware/noble')
 import { ref, reactive, onMounted, toRaw, onBeforeUnmount } from 'vue'
 import { Delete, Refresh, Pointer } from '@element-plus/icons-vue'
+import { ElMessage as Toast } from 'element-plus'
 import jsQR from 'jsqr'
-// 窗口控制函数
-const handleWin = (action) => {
-  // 在Electron环境中，这里应该调用主进程的窗口控制API
-  console.log('窗口控制:', action)
-}
-
+// 导入蓝牙协议工具函数
+import { buildReadRealtimeDataCmd, parseReadRealtimeDataResponse, parseDeviceStatus, buildOpenValveCmd, buildCloseValveCmd } from '../utils/bleProtocol'
+// 导入UUID转换工具函数
+import { convertTo128BitUUID } from '../utils/common'
 // 更新相关状态
 const updateStatus = ref({
   checking: false,
@@ -258,7 +257,6 @@ const stopScan = () => {
   stateTimer.value && clearInterval(stateTimer.value)
   timer.value && clearTimeout(timer.value)
   state.value = '扫描完成'
-  console.log(bluetoothDevices)
 }
 
 // 清理
@@ -275,7 +273,10 @@ const addDeviceToQueue = (device) => {
       name: device.name,
       mac: device.mac,
       connected: false,
-      rssi: device.rssi
+      rssi: device.rssi,
+      // 保留imei和tableId属性
+      imei: device.imei,
+      tableId: device.tableId
     })
     console.log('设备已添加到录入队列:', device.name)
   } else {
@@ -354,6 +355,11 @@ const startTest = async () => {
 // 连接设备用于测试
 const connectDeviceForTest = async (device) => {
   try {
+    // 如果设备已经在连接中，直接返回
+    if (device.connecting) {
+      console.log(`设备 ${device.name} 正在连接中，跳过重复连接`)
+      return
+    }
     // 更新设备状态为连接中
     device.connected = false
     device.connecting = true
@@ -374,6 +380,9 @@ const connectDeviceForTest = async (device) => {
           console.log(`找到设备 ${device.name}，准备连接...`)
           noble.removeListener('discover', deviceDiscoverListener)
           noble.stopScanning()
+          
+          // 清除超时定时器
+          clearTimeout(connectionTimeout)
           
           // 连接设备
             peripheral.connect((error) => {
@@ -402,7 +411,7 @@ const connectDeviceForTest = async (device) => {
                 return
               }
               
-              console.log(`设备 ${device.name} 服务发现成功:`, services)
+              console.log(`设备 ${device.name} 服务发现成功:`)
               
               // 为每个服务发现特征
               const characteristicsPromises = services.map((service) => {
@@ -429,6 +438,108 @@ const connectDeviceForTest = async (device) => {
                   // 保存peripheral实例以便后续断开连接
                   device.peripheral = peripheral
                   console.log(`设备 ${device.name} 特征发现成功`)
+                  
+                  // 查找写入和通知特征
+                  let writeChar = null
+                  let notifyChar = null
+                  
+                  // 获取并转换目标特征UUID
+                  const targetWriteUUID = settings.value.bluetoothServices.writeCharacteristic
+                  const targetNotifyUUID = settings.value.bluetoothServices.notifyCharacteristic
+                  
+                  // 遍历所有服务和特征，找到目标特征
+                  for (const serviceWithChar of servicesWithChars) {
+                    for (const characteristic of serviceWithChar.characteristics) {
+                      // 转换当前特征UUID并进行匹配
+                      const charUUID = convertTo128BitUUID(characteristic.uuid)
+                      if (charUUID === targetWriteUUID) {
+                        writeChar = characteristic
+                      }
+                      if (charUUID === targetNotifyUUID) {
+                        notifyChar = characteristic
+                      }
+                    }
+                  }
+                  
+                  if (writeChar && notifyChar) {
+                    console.log(`设备 ${device.name} 找到写入和通知特征`)
+                    
+                    // 保存特征到设备对象
+                    device.writeCharacteristic = writeChar
+                    device.notifyCharacteristic = notifyChar
+                    
+                    // 设置通知监听器
+                    notifyChar.on('data', (data, isNotification) => {
+                      if (isNotification) {
+                        try {
+                          // 解析设备响应数据
+                          const response = parseReadRealtimeDataResponse(data)
+                          console.log(`设备 ${device.name} 收到数据:`, response)
+                          
+                          // 更新设备实时数据
+                          if (response.data) {
+                            device.realtimeData = response.data
+                            // 解析设备状态
+                            if (response.data.deviceStatus) {
+                              device.status = response.data.deviceStatus
+                            }
+                          }
+                        } catch (error) {
+                          console.error(`设备 ${device.name} 解析数据失败:`, error)
+                        }
+                      }
+                    })
+                    
+                    // 启用通知
+                    notifyChar.notify(true, (error) => {
+                      if (error) {
+                        console.error(`设备 ${device.name} 启用通知失败:`, error)
+                      } else {
+                        console.log(`设备 ${device.name} 通知已启用`)
+                        
+                        // 构建并发送读取实时数据命令
+                        const sendReadDataCmd = (device) => {
+                          const cmds = buildReadRealtimeDataCmd(device)
+                          let sentCount = 0
+                          
+                          // 递归发送数据包，确保按顺序发送
+                          const sendNextPacket = () => {
+                            if (sentCount >= cmds.length) {
+                              console.log(`设备 ${device.name} 所有命令包发送完毕`)
+                              // 所有数据包发送完毕，可以开始处理监听数据
+                              return
+                            }
+                            
+                            const cmd = cmds[sentCount]
+                            const packetIndex = sentCount + 1
+                            
+                            writeChar.write(cmd, false, (error) => {
+                              if (error) {
+                                console.error(`设备 ${device.name} 发送命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+                              } else {
+                                console.log(`设备 ${device.name} 已发送读取实时数据命令包 ${packetIndex}/${cmds.length} ${cmd.toString('hex')}`)
+                                // 发送成功后，继续发送下一个包
+                                sentCount++
+                                sendNextPacket()
+                              }
+                            })
+                          }
+                          
+                          // 开始发送第一个包
+                          sendNextPacket()
+                        }
+                        
+                        // 立即发送一次命令
+                        // sendReadDataCmd(device)
+                        
+                        // 设置定时发送命令（每10秒一次）
+                        device.commandInterval = setInterval(() => sendReadDataCmd(device), 10000)
+                      }
+                    })
+                  } else {
+                    console.warn(`设备 ${device.name} 未找到目标特征`)
+                  }
+                  
                   resolve()
                 })
                 .catch((error) => {
@@ -442,14 +553,18 @@ const connectDeviceForTest = async (device) => {
       
       noble.on('discover', deviceDiscoverListener)
       
-      // 设置超时
-      setTimeout(() => {
+      // 设置超时并保存定时器引用
+      const connectionTimeout = setTimeout(() => {
         noble.removeListener('discover', deviceDiscoverListener)
         noble.stopScanning()
         device.connecting = false
         device.testResult = 'timeout' // 更新测试结果状态为超时
         // 更新测试统计信息
         updateTestStats()
+        Toast({
+          message: `连接超时：未找到设备 ${device.name}`,
+          type: 'error'
+        })
         reject(new Error(`连接超时：未找到设备 ${device.name}`))
       }, 10000)
     })
@@ -470,6 +585,13 @@ const disconnectDevice = (device) => {
   if (!device.connected || !device.peripheral) return
   
   try {
+    // 清除定时发送命令
+    if (device.commandInterval) {
+      clearInterval(device.commandInterval)
+      device.commandInterval = null
+      console.log(`已清除设备 ${device.name} 的定时发送命令`) 
+    }
+    
     const rawPeripheral = toRaw(device.peripheral)
     rawPeripheral.disconnect(function(error) {
       if (error) {
@@ -483,6 +605,13 @@ const disconnectDevice = (device) => {
       }
     })
   } catch (error) {
+    // 清除定时发送命令
+    if (device.commandInterval) {
+      clearInterval(device.commandInterval)
+      device.commandInterval = null
+      console.log(`已清除设备 ${device.name} 的定时发送命令`) 
+    }
+    
     console.error(`处理设备 ${device.name} 断开连接时出错:`, error)
     device.connected = false
     device.connecting = false
@@ -496,6 +625,13 @@ const reconnectDevice = async (device) => {
   if (!device.id || !device.mac) return
   
   console.log(`正在重连设备 ${device.name}...`)
+  
+  // 清除可能存在的旧的定时发送命令
+  if (device.commandInterval) {
+    clearInterval(device.commandInterval)
+    device.commandInterval = null
+    console.log(`已清除设备 ${device.name} 的旧定时发送命令`)
+  }
   
   // 如果设备已经连接，先断开连接
   if (device.connected) {
@@ -523,18 +659,84 @@ const reconnectDevice = async (device) => {
 
 // 开阀操作
 const openValve = (device) => {
-  if (!device.connected) return
+  if (!device.connected || !device.writeCharacteristic) return
   
   console.log(`打开设备 ${device.name} 的阀门...`)
-  // 这里需要实现实际的开阀逻辑
+  
+  try {
+    // 构建开阀命令
+    const cmds = buildOpenValveCmd(device)
+    let sentCount = 0
+    
+    // 递归发送数据包，确保按顺序发送
+    const sendNextPacket = () => {
+      if (sentCount >= cmds.length) {
+        console.log(`设备 ${device.name} 所有开阀命令包发送完毕`)
+        return
+      }
+      
+      const cmd = cmds[sentCount]
+      const packetIndex = sentCount + 1
+      
+      // 发送开阀命令包
+      device.writeCharacteristic.write(cmd, false, (error) => {
+        if (error) {
+          console.error(`设备 ${device.name} 发送开阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+        } else {
+          console.log(`设备 ${device.name} 已发送开阀命令包 ${packetIndex}/${cmds.length}`)
+          // 发送成功后，继续发送下一个包
+          sentCount++
+          sendNextPacket()
+        }
+      })
+    }
+    
+    // 开始发送第一个包
+    sendNextPacket()
+  } catch (error) {
+    console.error(`设备 ${device.name} 构建开阀命令失败:`, error)
+  }
 }
 
 // 关阀操作
 const closeValve = (device) => {
-  if (!device.connected) return
+  if (!device.connected || !device.writeCharacteristic) return
   
   console.log(`关闭设备 ${device.name} 的阀门...`)
-  // 这里需要实现实际的关阀逻辑
+  
+  try {
+    // 构建关阀命令
+    const cmds = buildCloseValveCmd(device)
+    let sentCount = 0
+    
+    // 递归发送数据包，确保按顺序发送
+    const sendNextPacket = () => {
+      if (sentCount >= cmds.length) {
+        console.log(`设备 ${device.name} 所有关阀命令包发送完毕`)
+        return
+      }
+      
+      const cmd = cmds[sentCount]
+      const packetIndex = sentCount + 1
+      
+      // 发送关阀命令包
+      device.writeCharacteristic.write(cmd, false, (error) => {
+        if (error) {
+          console.error(`设备 ${device.name} 发送关阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+        } else {
+          console.log(`设备 ${device.name} 已发送关阀命令包 ${packetIndex}/${cmds.length}`)
+          // 发送成功后，继续发送下一个包
+          sentCount++
+          sendNextPacket()
+        }
+      })
+    }
+    
+    // 开始发送第一个包
+    sendNextPacket()
+  } catch (error) {
+    console.error(`设备 ${device.name} 构建关阀命令失败:`, error)
+  }
 }
 
 // 断开所有蓝牙设备
@@ -593,6 +795,12 @@ const completeDeviceTest = (device) => {
 const removeDevice = (device) => {
   const index = devices.findIndex(d => d.id === device.id)
   if (index !== -1) {
+    // 清除定时发送命令
+    if (device.commandInterval) {
+      clearInterval(device.commandInterval)
+      device.commandInterval = null
+      console.log(`已清除设备 ${device.name} 的定时发送命令`)
+    }
     // 先断开设备
     disconnectDevice(device)
     // 从列表中移除
@@ -618,6 +826,15 @@ const completeTest = async () => {
   const saveSuccess = await saveTestRecord()
   
   if (saveSuccess) {
+    // 清除所有设备的定时发送命令
+    devices.forEach(device => {
+      if (device.commandInterval) {
+        clearInterval(device.commandInterval)
+        device.commandInterval = null
+        console.log(`已清除设备 ${device.name} 的定时发送命令`)
+      }
+    })
+    
     // 断开所有设备
     disconnectAllDevices()
     
@@ -661,12 +878,6 @@ const handleBarcodeInput = () => {
 
 // 处理扫码枪输入完成（Enter键）
 const handleBarcodeEnter = () => {
-  // 检查是否有未完成的测试
-  // if (devices.length > 0 && !testCompleted.value) {
-  //   alert('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
-  //   return
-  // }
-  
   if (barcodeInput.value.trim()) {
     const barcode = barcodeInput.value.trim()
     console.log('扫码枪输入完成:', barcode)
@@ -674,29 +885,24 @@ const handleBarcodeEnter = () => {
     // 解析条码数据并创建设备对象
     // 假设条码格式为：设备名称_设备ID_MAC地址
     // 例如：Device1_123456_00:11:22:33:44:55
-    const barcodeParts = barcode.split('_')
+    const barcodeParts = barcode.split(',')
     let device = null
     
     if (barcodeParts.length === 3) {
       // 完整格式的条码
       device = {
-        id: barcodeParts[1],
-        name: barcodeParts[0],
-        mac: barcodeParts[2],
+        id: barcodeParts[0].slice(5),
+        tableId: `C${barcodeParts[2]}`,
+        imei: barcodeParts[2],
+        name: barcodeParts[1],
+        mac: barcodeParts[0].slice(5).match(/.{2}/g).join(':'),
         connected: false,
         rssi: -60 // 默认RSSI值
       }
     } else {
-      // 简单格式的条码（仅设备ID）
-      device = {
-        id: barcode,
-        name: `Device_${barcode}`,
-        mac: `00:00:00:00:00:00`,
-        connected: false,
-        rssi: -60 // 默认RSSI值
-      }
+      barcodeInput.value = ''
+      return alert('条码格式错误，请检查')
     }
-    
     // 添加设备到队列
     addDeviceToQueue(device)
     
@@ -766,26 +972,22 @@ const parseQRCodeContent = (content) => {
   if (match) {
     // 提取信息
     const bluetoothHeader = 'ecv02'
-    const deviceMac = match[1]
+    const id = match[1]
+    const deviceMac = match[1].match(/.{2}/g).join(':')
     const productId = match[2]
     const imei = match[3]
     
-    console.log('解析成功:', {
-      bluetoothHeader,
-      deviceMac,
-      productId,
-      imei
-    })
-    
     // 创建设备对象
     const device = {
-      id: deviceMac, // 使用mac地址作为设备ID
-      name: `Device_${productId}`,
+      id, // 使用mac地址作为设备ID
+      name: productId,
+      imei,
+      tableId: `C${imei}`,
       mac: deviceMac,
       connected: false,
       rssi: -60 // 默认RSSI值
     }
-    
+    console.log('解析成功:', device)
     // 添加设备到队列
     addDeviceToQueue(device)
     
@@ -798,11 +1000,11 @@ const parseQRCodeContent = (content) => {
     // 格式不符合要求
     console.error('二维码格式不正确')
     alert('二维码格式不正确，请扫描正确的设备二维码。\n\n正确格式示例：ecv02ec308e52b393,C001202511181700,861606086013598')
-    
+    return
     // 继续检测
-    if (!qrDetectionInterval && isCameraActive.value) {
-      qrDetectionInterval = setInterval(detectQRCode, 300)
-    }
+    // if (!qrDetectionInterval && isCameraActive.value) {
+    //   qrDetectionInterval = setInterval(detectQRCode, 300)
+    // }
   }
 }
 
@@ -885,9 +1087,9 @@ const settings = ref({
     adapters: ['Intel(R) Wireless Bluetooth(R)', 'Generic Bluetooth Adapter']
   },
   bluetoothServices: {
-    mainService: '0000FE60-0000-1000-8000-00805F9B34FB',
-    writeCharacteristic: '0000FE61-0000-1000-8000-00805F9B34FB',
-    notifyCharacteristic: '0000FE62-0000-1000-8000-00805F9B34FB'
+    mainService: '0000fe60-0000-1000-8000-00805f9b34fb',
+    writeCharacteristic: '0000fe61-0000-1000-8000-00805f9b34fb',
+    notifyCharacteristic: '0000fe62-0000-1000-8000-00805f9b34fb'
   },
   scanFilters: {
     names: ['ecv02']
@@ -926,18 +1128,23 @@ const saveSettings = () => {
   
   // 主服务校验
   if (!validatedSettings.bluetoothServices.mainService?.trim()) {
-    validatedSettings.bluetoothServices.mainService = currentServices.mainService || '0000FE60-0000-1000-8000-00805F9B34FB'
+    validatedSettings.bluetoothServices.mainService = currentServices.mainService || '0000fe60-0000-1000-8000-00805f9b34fb'
   }
   
   // 写入特征校验
   if (!validatedSettings.bluetoothServices.writeCharacteristic?.trim()) {
-    validatedSettings.bluetoothServices.writeCharacteristic = currentServices.writeCharacteristic || '0000FE61-0000-1000-8000-00805F9B34FB'
+    validatedSettings.bluetoothServices.writeCharacteristic = currentServices.writeCharacteristic || '0000fe61-0000-1000-8000-00805f9b34fb'
   }
   
   // 监听特征校验
   if (!validatedSettings.bluetoothServices.notifyCharacteristic?.trim()) {
-    validatedSettings.bluetoothServices.notifyCharacteristic = currentServices.notifyCharacteristic || '0000FE62-0000-1000-8000-00805F9B34FB'
+    validatedSettings.bluetoothServices.notifyCharacteristic = currentServices.notifyCharacteristic || '0000fe62-0000-1000-8000-00805f9b34fb'
   }
+  
+  // 将所有蓝牙服务值转为小写
+  validatedSettings.bluetoothServices.mainService = validatedSettings.bluetoothServices.mainService.toLowerCase()
+  validatedSettings.bluetoothServices.writeCharacteristic = validatedSettings.bluetoothServices.writeCharacteristic.toLowerCase()
+  validatedSettings.bluetoothServices.notifyCharacteristic = validatedSettings.bluetoothServices.notifyCharacteristic.toLowerCase()
   
   // 更新本地设置
   settings.value = validatedSettings
@@ -953,6 +1160,20 @@ const loadSettings = () => {
   if (savedSettings) {
     try {
       const parsedSettings = JSON.parse(savedSettings)
+      
+      // 将加载的蓝牙服务值转为小写
+      if (parsedSettings.bluetoothServices) {
+        if (parsedSettings.bluetoothServices.mainService) {
+          parsedSettings.bluetoothServices.mainService = parsedSettings.bluetoothServices.mainService.toLowerCase()
+        }
+        if (parsedSettings.bluetoothServices.writeCharacteristic) {
+          parsedSettings.bluetoothServices.writeCharacteristic = parsedSettings.bluetoothServices.writeCharacteristic.toLowerCase()
+        }
+        if (parsedSettings.bluetoothServices.notifyCharacteristic) {
+          parsedSettings.bluetoothServices.notifyCharacteristic = parsedSettings.bluetoothServices.notifyCharacteristic.toLowerCase()
+        }
+      }
+      
       // 合并设置，而不是完全替换，这样新添加的默认值会保留
       settings.value = {
         ...settings.value,
@@ -1185,10 +1406,10 @@ const clearSettings = () => {
                           </div>
                           <span class="text-[10px] text-slate-500">{{ device.rssi }} dBm</span>
                         </div>
-                        <button
+                        <!-- <button
                           class="border-none px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded hover:bg-blue-500 hover:text-white transition" @click="addDeviceToQueue(device)">
                           添加
-                        </button>
+                        </button> -->
                       </div>
                     </div>
                   </div>
