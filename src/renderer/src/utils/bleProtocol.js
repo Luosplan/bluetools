@@ -132,7 +132,7 @@ export function splitDataIntoPackets(data, packetSize = 20) {
  * @param {number} [packetSize=20] - 分包大小，默认20
  * @returns {Buffer[]} - 构建好的命令缓冲区数组，包含分包后的命令
  */
-export function buildReadRealtimeDataCmd(options, packetSize = 20) {
+export function buildReadRealtimeDataCmd(options, packetSize = 40) {
   const { tableId, mac } = options
 
   // 构建数据命令对象
@@ -163,13 +163,10 @@ export function buildReadRealtimeDataCmd(options, packetSize = 20) {
   const dataToCheck = Object.values(dataCmd).join('')
   const byteArray = hexStringToByteArray(dataToCheck)
   dataCmd.cs = crc16(byteArray)
-  console.log(dataCmd);
   // 构建完整命令
   const head = 'AA'
   const end = '55'
   const res = head + Object.values(dataCmd).join('') + end
-  console.log(res.toUpperCase());
-
   // 转换为Buffer
   const fullCommand = hexStringToBuffer(res.toUpperCase())
   // 分包发送，默认包大小20
@@ -185,7 +182,7 @@ export function buildReadRealtimeDataCmd(options, packetSize = 20) {
  * @param {number} [packetSize=20] - 分包大小，默认20
  * @returns {Buffer[]} - 构建好的命令缓冲区数组，包含分包后的命令
  */
-export function buildOpenValveCmd(options, packetSize = 20) {
+export function buildOpenValveCmd(options, packetSize = 40) {
   const { tableId, mac } = options
 
   // 构建数据命令对象
@@ -203,7 +200,7 @@ export function buildOpenValveCmd(options, packetSize = 20) {
 
   // 填充数据域
   if (mac) {
-    dataCmd.data = convertMacAddressToHex(mac)
+    dataCmd.data = convertMacAddressToHex(mac) + '01'
   }
 
   // 计算长度
@@ -236,7 +233,7 @@ export function buildOpenValveCmd(options, packetSize = 20) {
  * @param {number} [packetSize=20] - 分包大小，默认20
  * @returns {Buffer[]} - 构建好的命令缓冲区数组，包含分包后的命令
  */
-export function buildCloseValveCmd(options, packetSize = 20) {
+export function buildCloseValveCmd(options, packetSize = 40) {
   const { tableId, mac } = options
 
   // 构建数据命令对象
@@ -254,7 +251,7 @@ export function buildCloseValveCmd(options, packetSize = 20) {
 
   // 填充数据域
   if (mac) {
-    dataCmd.data = convertMacAddressToHex(mac)
+    dataCmd.data = convertMacAddressToHex(mac) + '02'
   }
 
   // 计算长度
@@ -287,14 +284,18 @@ export function parseReadRealtimeDataResponse(response) {
   if (!Buffer.isBuffer(response) || response.length < 10) {
     throw new Error('无效的响应数据')
   }
-  console.log('response', response.length);
   // 转换为十六进制字符串进行处理
   const hexString = arrayBufferToHex(response)
-  console.log(hexString);
   const dataStr = hexString.substr(98, 32)
-  const rsData = parseDataField(dataStr)
-  console.log(rsData);
-  return rsData
+  if(hexString.slice(6).includes('b0')) {
+    const rsData = parseDataField(dataStr)
+    // 返回解析后的数据，不包含firmwareVersion字段
+    return rsData
+  }else {
+    console.log(hexString);
+    // 开关阀解析
+    return {}
+  }
 }
 
 /**
@@ -303,11 +304,6 @@ export function parseReadRealtimeDataResponse(response) {
  * @returns {Object} - 解析后的数据域对象，包含设备信息和解析后的数据
  */
 function parseDataField(dataField) {
-  console.log('dataField', dataField);
-  // if (dataField.length < 64) {
-  //   throw new Error('数据域长度不足')
-  // }
-
   // 解析设备信息
   const deviceInfo = {
     padding: dataField.substring(0, 4), // D0-D1: 补位 (0x07 无实际意义，HEX码)
@@ -317,8 +313,7 @@ function parseDataField(dataField) {
   }
 
   // 解析数据域 (D30-D45)，提取16字节数据用于设备数据解析
-  const dataPayload = dataField.substring(60, 92)
-  const parsedData = parseDeviceData(dataPayload)
+  const parsedData = parseDeviceData(dataField)
 
   return {
     deviceInfo,
@@ -352,18 +347,29 @@ const arrayBufferToHex = (buffer) => {
  * @returns {Object} - 解析后的数据对象
  */
 export function parseDeviceData(data) {
-  // if (data.length !== 32) {
-  //   throw new Error('设备数据长度错误')
-  // }
-
   // 将十六进制字符串转换为Uint8Array，然后创建DataView
   const bytes = hexStringToUint8Array(data)
   const view = new DataView(bytes.buffer);
   
   // 解析基本数据
+  const flowValue = view.getFloat32(0, true);
+  const pressureValue = view.getUint32(4, true);
+  
+  // 格式化流量值：0时显示"0"，非0时保留3位小数，null时显示"--"
+  const formatFlowValue = (value) => {
+    if (value === null || value === undefined) return null;
+    return value === 0 ? '0' : value.toFixed(3);
+  };
+  
+  // 格式化压力值：0时显示"0"，非0时保留3位小数，null时显示"--"
+  const formatPressureValue = (value) => {
+    if (value === null || value === undefined) return null;
+    return value === 0 ? '0' : value.toFixed(3);
+  };
+  
   let parsedData = {
-    peakExpiratoryFlow: view.getFloat32(0, true).toFixed(3), // 流量值(4字节，Float类型，小端字节序)
-    meterPressure: view.getUint32(4, true), // 绝压值(4字节，uint32类型，小端字节序)
+    peakExpiratoryFlow: formatFlowValue(flowValue), // 流量值(4字节，Float类型，小端字节序)
+    meterPressure: formatPressureValue(pressureValue), // 绝压值(4字节，uint32类型，小端字节序)
     temperature: view.getInt16(8, true) / 100, // 温度值(2字节，int16类型，放大100倍，小端字节序)
     batteryVoltage: view.getUint16(10, true) / 100, // 电池电压(2字节，uint16类型，放大100倍，小端字节序)
   };

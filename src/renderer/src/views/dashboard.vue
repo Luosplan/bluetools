@@ -37,7 +37,7 @@ const checkForUpdates = () => {
       console.error('更新检查超时')
       updateStatus.value.checking = false
       updateStatus.value.error = '检查更新超时，请稍后重试'
-      alert('检查更新超时，请稍后重试')
+      Toast.info('检查更新超时，请稍后重试')
     }
   }, 10000) // 10秒超时
   
@@ -109,8 +109,8 @@ if (window.ipcRenderer) {
   // 监听没有更新的情况
   window.ipcRenderer.on('update-not-available', (info) => {
     updateStatus.value.checking = false
-    // 使用 alert 提示用户暂无新版本
-    alert('暂无新版本')
+    // 提示用户暂无新版本
+    Toast.info('暂无新版本')
   })
 
   // 监听应用版本信息
@@ -140,13 +140,13 @@ const testStarted = ref(false)
 const handleTabClick = (tabId) => {
   // 如果测试已开始，只允许停留在测试标签页
   if (testStarted.value && (tabId === 'scan' || tabId === 'settings')) {
-    return alert('请先删除测试设备或完成测试')
+    return Toast.info('请先删除测试设备或完成测试')
   }
   
   // 如果要切换到测试标签页，检查是否已录入设备
   if (tabId === 'test' && !testStarted.value) {
     if (devices.length === 0) {
-      alert('请先录入设备')
+      return Toast.info('请先录入设备')
     } else {
       // 直接调用开始测试
       startTest()
@@ -192,7 +192,7 @@ const initBluetooth = () => {
 // 检查蓝牙状态
 const checkBluetoothState = () => {
   if (bluetoothState.value !== 'poweredOn') {
-    alert('蓝牙未开启，请打开蓝牙')
+    Toast.info('蓝牙未开启，请打开蓝牙')
     return false
   }
   return true
@@ -200,15 +200,19 @@ const checkBluetoothState = () => {
 
 // 扫描设备
 const scan = async () => {
-  if (!checkBluetoothState()) return
+  if (!checkBluetoothState()) {
+    initBluetooth()
+  }
+  if (isScanning.value) return
   state.value = '扫描中'
   isScanning.value = true
   stateTimer.value && clearInterval(stateTimer.value)
   timer.value && clearTimeout(timer.value)
   bluetoothDevices.length = 0
-  noble.startScanning([], true)
-  noble.on('discover', function (peripheral) {
-    const isConnectable = peripheral.connectable
+  
+  // 定义设备发现监听器
+  const deviceDiscoverListener = (peripheral) => {
+    // const isConnectable = peripheral.connectable
     const deviceId = peripheral.id
     const isAlreadyDiscovered = bluetoothDevices.some((device) => device.id === deviceId)
     const deviceName = peripheral.advertisement.localName || ''
@@ -225,7 +229,7 @@ const scan = async () => {
       deviceName.toLowerCase().includes(filterName.toLowerCase())
     ) : true
     
-    if (isConnectable && !isAlreadyDiscovered && matchesFilter) {
+    if (!isAlreadyDiscovered && matchesFilter) {
       // 将完整的peripheral对象添加到设备列表中，确保保留所有方法
       const device = {
         id: deviceId,
@@ -237,20 +241,37 @@ const scan = async () => {
       Object.assign(device, peripheral)
       bluetoothDevices.push(device)
     }
-  })
+  }
+  
+  // 移除可能存在的旧监听器
+  noble.removeAllListeners('discover')
+  // 添加新的监听器
+  noble.on('discover', deviceDiscoverListener)
+  
+  // 开始扫描
+  noble.startScanning([], true)
+  
   stateTimer.value = setInterval(() => {
     state.value += '*'
     if (state.value.length > 5) {
       state.value = '扫描中'
     }
   }, 500)
+  
   timer.value = setTimeout(() => {
-    stopScan()
+    stopScan(deviceDiscoverListener)
   }, 15000)
 }
 
 // 停止扫描
-const stopScan = () => {
+const stopScan = (deviceDiscoverListener = null) => {
+  // 移除监听器
+  if (deviceDiscoverListener) {
+    noble.removeListener('discover', deviceDiscoverListener)
+  } else {
+    noble.removeAllListeners('discover')
+  }
+  
   noble.stopScanning()
   isScanning.value = false
   console.log('停止扫描')
@@ -323,10 +344,12 @@ const clearDevicesQueue = () => {
 // 开始测试函数
 const startTest = async () => {
   if (devices.length === 0) {
-    alert('请先添加设备到录入队列')
+    Toast.info('请先添加设备到录入队列')
     return
   }
-  if (!checkBluetoothState()) return
+  if (!checkBluetoothState()) {
+    initBluetooth()
+  }
   // 重置测试完成状态
   testCompleted.value = false
   
@@ -400,6 +423,45 @@ const connectDeviceForTest = async (device) => {
             device.connected = true
             device.connecting = false
             device.testResult = 'success' // 更新测试结果状态为成功
+            
+            // 初始化设备实时数据属性，确保响应式
+            device.realtimeData = {}
+            device.temperature = '--'
+            device.pressure = '--'
+            device.flow = '--'
+            device.voltage = '--'
+            device.batteryVoltage = '--'
+            device.overFlow = false
+            device.crossFlow = false
+            device.microFlow = false
+            device.valveStatus = '关闭'
+            device.leakAlarm = false
+            device.overTemp = false
+            device.overPressure = false
+            device.underPressure = false
+            device.pressureSensorFault = false
+            device.flowSensorFault = false
+            device.fluidMedium = '未知'
+            device.alarmStr = ''
+            device.dataTime = '--'
+            
+            // 添加设备断开监听器，处理意外断开情况
+            peripheral.on('disconnect', () => {
+              console.log(`设备 ${device.name} 意外断开连接`);
+              Toast.info(`设备 ${device.name} 连接已断开`)
+              // 清除定时发送命令
+              if (device.commandInterval) {
+                clearInterval(device.commandInterval);
+                device.commandInterval = null;
+                console.log(`已清除设备 ${device.name} 的定时发送命令`);
+              }
+              // 更新设备状态
+              device.connected = false;
+              device.connecting = false;
+              device.testResult = 'disconnected';
+              updateTestStats();
+            });
+            
             // 更新测试统计信息
             updateTestStats()
             
@@ -473,17 +535,41 @@ const connectDeviceForTest = async (device) => {
                       if (isNotification) {
                         try {
                           // 解析设备响应数据
-                          const response = parseReadRealtimeDataResponse(data)
+                          const response = {
+                            ...device,
+                            ...parseReadRealtimeDataResponse(data)
+                          }
                           console.log(`设备 ${device.name} 收到数据:`, response)
                           
-                          // 更新设备实时数据
-                          if (response.data) {
-                            device.realtimeData = response.data
-                            // 解析设备状态
-                            if (response.data.deviceStatus) {
-                              device.status = response.data.deviceStatus
-                            }
+                          // 更新设备实时数据到对应属性，供UI显示
+                          // 保存原始数据
+                          device.realtimeData = response
+                          // 更新设备状态
+                          if (response.deviceStatus) {
+                            device.status = response.deviceStatus
                           }
+                          // 更新具体数据字段
+                          device.temperature = response.temperature || '--'
+                          device.pressure = response.meterPressure !== null ? response.meterPressure : '--'
+                          device.flow = response.peakExpiratoryFlow || '--'
+                          device.voltage = '--' // 协议中未提供该字段
+                          device.batteryVoltage = response.batteryVoltage || '--'
+                          // 更新状态标志（将字符串"0"/"1"转换为布尔值）
+                          device.overFlow = response.overFlow === '1' || false
+                          device.crossFlow = response.pipelineLeak === '1' || false
+                          device.microFlow = response.microFlow === '1' || false
+                          // 更新其他状态
+                          device.valveStatus = response.valveStatus === '1' ? '开启' : '关闭'
+                          device.leakAlarm = response.leakAlarm === '1' || false
+                          device.overTemp = response.overTemp === '1' || false
+                          device.overPressure = response.overPressure === '1' || false
+                          device.underPressure = response.underPressure === '1' || false
+                          device.pressureSensorFault = response.pressureSensorFault === '1' || false
+                          device.flowSensorFault = response.flowSensorFault === '1' || false
+                          device.fluidMedium = response.fluidMedium || '未知'
+                          device.alarmStr = response.alarmStr || ''
+                          // 更新数据时间
+                          device.dataTime = new Date().toLocaleTimeString()
                         } catch (error) {
                           console.error(`设备 ${device.name} 解析数据失败:`, error)
                         }
@@ -499,38 +585,44 @@ const connectDeviceForTest = async (device) => {
                         
                         // 构建并发送读取实时数据命令
                         const sendReadDataCmd = (device) => {
-                          const cmds = buildReadRealtimeDataCmd(device)
-                          let sentCount = 0
-                          
-                          // 递归发送数据包，确保按顺序发送
-                          const sendNextPacket = () => {
-                            if (sentCount >= cmds.length) {
-                              console.log(`设备 ${device.name} 所有命令包发送完毕`)
-                              // 所有数据包发送完毕，可以开始处理监听数据
-                              return
-                            }
-                            
-                            const cmd = cmds[sentCount]
-                            const packetIndex = sentCount + 1
-                            
-                            writeChar.write(cmd, false, (error) => {
-                              if (error) {
-                                console.error(`设备 ${device.name} 发送命令包 ${packetIndex}/${cmds.length} 失败:`, error)
-                              } else {
-                                console.log(`设备 ${device.name} 已发送读取实时数据命令包 ${packetIndex}/${cmds.length} ${cmd.toString('hex')}`)
-                                // 发送成功后，继续发送下一个包
-                                sentCount++
-                                sendNextPacket()
-                              }
-                            })
+                          // 检查设备是否连接
+                          if (!device.connected || !device.writeCharacteristic) {
+                            console.warn(`设备 ${device.name} 未连接，跳过发送命令`)
+                            return
                           }
                           
-                          // 开始发送第一个包
-                          sendNextPacket()
+                          try {
+                            const cmds = buildReadRealtimeDataCmd(device)
+                            let sentCount = 0
+                            
+                            // 递归发送数据包，确保按顺序发送
+                            const sendNextPacket = () => {
+                              if (sentCount >= cmds.length) {
+                                // 所有数据包发送完毕，可以开始处理监听数据
+                                return
+                              }
+                              
+                              const cmd = cmds[sentCount]
+                              const packetIndex = sentCount + 1
+                              
+                              writeChar.write(cmd, false, (error) => {
+                                if (error) {
+                                  console.error(`设备 ${device.name} 发送命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+                                } else {
+                                  // console.log(`设备 ${device.name} 已发送读取实时数据命令包 ${packetIndex}/${cmds.length} ${cmd.toString('hex')}`)
+                                  // 发送成功后，继续发送下一个包
+                                  sentCount++
+                                  sendNextPacket()
+                                }
+                              })
+                            }
+                            
+                            // 开始发送第一个包
+                            sendNextPacket()
+                          } catch (error) {
+                            console.error(`设备 ${device.name} 发送命令失败:`, error)
+                          }
                         }
-                        
-                        // 立即发送一次命令
-                        // sendReadDataCmd(device)
                         
                         // 设置定时发送命令（每10秒一次）
                         device.commandInterval = setInterval(() => sendReadDataCmd(device), 10000)
@@ -664,6 +756,8 @@ const openValve = (device) => {
   console.log(`打开设备 ${device.name} 的阀门...`)
   
   try {
+    // 使用toRaw转换为原始对象，避免响应式包装导致的属性访问问题
+    const rawDevice = toRaw(device)
     // 构建开阀命令
     const cmds = buildOpenValveCmd(device)
     let sentCount = 0
@@ -679,7 +773,7 @@ const openValve = (device) => {
       const packetIndex = sentCount + 1
       
       // 发送开阀命令包
-      device.writeCharacteristic.write(cmd, false, (error) => {
+      rawDevice.writeCharacteristic.write(cmd, false, (error) => {
         if (error) {
           console.error(`设备 ${device.name} 发送开阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
         } else {
@@ -705,6 +799,8 @@ const closeValve = (device) => {
   console.log(`关闭设备 ${device.name} 的阀门...`)
   
   try {
+    // 使用toRaw转换为原始对象，避免响应式包装导致的属性访问问题
+    const rawDevice = toRaw(device)
     // 构建关阀命令
     const cmds = buildCloseValveCmd(device)
     let sentCount = 0
@@ -720,7 +816,7 @@ const closeValve = (device) => {
       const packetIndex = sentCount + 1
       
       // 发送关阀命令包
-      device.writeCharacteristic.write(cmd, false, (error) => {
+      rawDevice.writeCharacteristic.write(cmd, false, (error) => {
         if (error) {
           console.error(`设备 ${device.name} 发送关阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
         } else {
@@ -818,7 +914,7 @@ const removeDevice = (device) => {
 // 完成测试功能
 const completeTest = async () => {
   if (devices.length === 0) {
-    alert('没有测试设备，无法完成测试')
+    Toast.info('没有测试设备，无法完成测试')
     return
   }
   
@@ -850,9 +946,9 @@ const completeTest = async () => {
     // 重置测试开始状态
     testStarted.value = false
     
-    alert('测试已完成，记录已保存')
+    Toast.info('测试已完成，记录已保存')
   } else {
-    alert('测试记录保存失败')
+    Toast.error('测试记录保存失败')
   }
 }
 
@@ -901,7 +997,7 @@ const handleBarcodeEnter = () => {
       }
     } else {
       barcodeInput.value = ''
-      return alert('条码格式错误，请检查')
+      return Toast.info('条码格式错误，请检查')
     }
     // 添加设备到队列
     addDeviceToQueue(device)
@@ -958,7 +1054,7 @@ const parseQRCodeContent = (content) => {
   
   // 检查是否有未完成的测试
   if (testStarted.value) {
-    alert('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
+    Toast.info('当前测试尚未完成，请先完成测试或删除所有设备后再录入新设备')
     // 关闭摄像头
     startCamera()
     return
@@ -995,11 +1091,11 @@ const parseQRCodeContent = (content) => {
     startCamera()
     
     // 提示成功
-    alert(`设备录入成功！\n产品编号：${productId}\nMAC地址：${deviceMac}`)
+    Toast.success(`设备录入成功！\n产品编号：${productId}\nMAC地址：${deviceMac}`)
   } else {
     // 格式不符合要求
     console.error('二维码格式不正确')
-    alert('二维码格式不正确，请扫描正确的设备二维码。\n\n正确格式示例：ecv02ec308e52b393,C001202511181700,861606086013598')
+    Toast.error('二维码格式不正确，请扫描正确的设备二维码。\n\n正确格式示例：ecv02ec308e52b393,C001202511181700,861606086013598')
     return
     // 继续检测
     // if (!qrDetectionInterval && isCameraActive.value) {
@@ -1052,7 +1148,7 @@ const startCamera = async () => {
     }
   } catch (error) {
     console.error('摄像头操作失败:', error)
-    alert('无法访问摄像头，请检查权限设置')
+    Toast.error('无法访问摄像头，请检查权限设置')
   }
 }
 
@@ -1406,10 +1502,10 @@ const clearSettings = () => {
                           </div>
                           <span class="text-[10px] text-slate-500">{{ device.rssi }} dBm</span>
                         </div>
-                        <!-- <button
+                        <button
                           class="border-none px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded hover:bg-blue-500 hover:text-white transition" @click="addDeviceToQueue(device)">
                           添加
-                        </button> -->
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1516,8 +1612,8 @@ const clearSettings = () => {
                   <!-- 设备详细数据 -->
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 min-w-0">
                     <div class="text-xs text-slate-400 whitespace-nowrap">
-                      <div class="text-slate-300 font-medium">固件版本</div>
-                      <div class="text-white">{{ dev.firmwareVersion || '--' }}</div>
+                      <div class="text-slate-300 font-medium">阀门</div>
+                      <div class="text-white">{{ dev.valveStatus || '--' }}</div>
                     </div>
                     <div class="text-xs text-slate-400 whitespace-nowrap">
                       <div class="text-slate-300 font-medium">温度</div>
@@ -1525,15 +1621,15 @@ const clearSettings = () => {
                     </div>
                     <div class="text-xs text-slate-400 whitespace-nowrap">
                       <div class="text-slate-300 font-medium">压力</div>
-                      <div class="text-white">{{ dev.pressure || '--' }} kPa</div>
+                      <div class="text-white">{{ dev.pressure !== null ? dev.pressure : '--' }} kPa</div>
                     </div>
                     <div class="text-xs text-slate-400 whitespace-nowrap">
                       <div class="text-slate-300 font-medium">流量</div>
-                      <div class="text-white">{{ dev.flow || '--' }} L/min</div>
+                      <div class="text-white">{{ dev.flow || '--' }} Nm³/h</div>
                     </div>
                     <div class="text-xs text-slate-400 whitespace-nowrap">
                       <div class="text-slate-300 font-medium">电压</div>
-                      <div class="text-white">{{ dev.voltage || '--' }} V</div>
+                      <div class="text-white">{{ dev.batteryVoltage || '--' }} V</div>
                     </div>
                     <div class="text-xs text-slate-400 whitespace-nowrap">
                       <div class="text-slate-300 font-medium">超流</div>
