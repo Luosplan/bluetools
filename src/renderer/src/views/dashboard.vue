@@ -200,7 +200,7 @@ const checkBluetoothState = () => {
 
 // 扫描设备
 const scan = async () => {
-  if (!checkBluetoothState()) {
+  if (bluetoothState.value !== 'poweredOn') {
     initBluetooth()
   }
   if (isScanning.value) return
@@ -347,7 +347,7 @@ const startTest = async () => {
     Toast.info('请先添加设备到录入队列')
     return
   }
-  if (!checkBluetoothState()) {
+  if (bluetoothState.value !== 'poweredOn') {
     initBluetooth()
   }
   // 重置测试完成状态
