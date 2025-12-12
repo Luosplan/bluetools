@@ -1369,29 +1369,7 @@ const clearSettings = () => {
 
 <template>
   <div class="h-screen flex flex-col">
-    <!-- 1. 顶部标题栏 (自定义 Windows 风格) -->
-    <!-- <header class="h-10 flex items-center justify-between glass-panel border-b-0 z-50 title-bar-drag select-none">
-      <div class="flex items-center gap-3 px-4">
-        <div class="w-5 h-5 bg-gradient-to-tr from-blue-500 to-cyan-400 rounded-md flex items-center justify-center">
-          <i class="ri-bluetooth-line text-white text-xs"></i>
-        </div>
-        <span class="text-xs font-medium text-slate-300 tracking-wide">BLE Master Pro</span>
-      </div>
-
-      <div class="flex h-full no-drag">
-        <div class="win-btn" title="最小化" @click="handleWin('min')">
-          <i class="ri-subtract-line text-lg"></i>
-        </div>
-        <div class="win-btn" title="最大化" @click="handleWin('max')">
-          <i class="ri-checkbox-blank-line text-xs"></i>
-        </div>
-        <div class="win-btn close" title="关闭" @click="handleWin('close')">
-          <i class="ri-close-line text-lg"></i>
-        </div>
-      </div>
-    </header> -->
-
-    <!-- 2. 主布局 -->
+    <!-- 1. 主布局 -->
     <main class="flex-1 flex overflow-hidden relative">
       <!-- 侧边导航 -->
       <nav class="w-16 glass-panel border-t-0 flex flex-col items-center py-6 gap-6 z-40">
