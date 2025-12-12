@@ -202,6 +202,7 @@ const checkBluetoothState = () => {
 const scan = async () => {
   if (bluetoothState.value !== 'poweredOn') {
     initBluetooth()
+    if (!checkBluetoothState()) return
   }
   if (isScanning.value) return
   state.value = '扫描中'
@@ -349,6 +350,7 @@ const startTest = async () => {
   }
   if (bluetoothState.value !== 'poweredOn') {
     initBluetooth()
+    if (!checkBluetoothState()) return
   }
   // 重置测试完成状态
   testCompleted.value = false
