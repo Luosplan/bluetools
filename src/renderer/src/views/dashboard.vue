@@ -265,8 +265,8 @@ const scan = async () => {
 
 // 停止扫描
 const stopScan = (deviceDiscoverListener = null) => {
-  // 移除监听器
-  if (deviceDiscoverListener) {
+  // 移除监听器，确保deviceDiscoverListener是函数类型
+  if (typeof deviceDiscoverListener === 'function') {
     noble.removeListener('discover', deviceDiscoverListener)
   } else {
     noble.removeAllListeners('discover')
@@ -445,10 +445,15 @@ const connectDeviceForTest = async (device) => {
             device.alarmStr = ''
             device.dataTime = '--'
             
+            // 添加设备断开监听器前，先移除旧的监听器，避免累积
+            peripheral.removeAllListeners('disconnect');
             // 添加设备断开监听器，处理意外断开情况
             peripheral.on('disconnect', () => {
-              console.log(`设备 ${device.name} 意外断开连接`);
-              Toast.info(`设备 ${device.name} 连接已断开`)
+              console.log(`设备 ${device.name} 断开连接`);
+              // 只有当不是手动断开时才显示提示
+              if (!device.isManuallyDisconnecting) {
+                Toast.info(`设备 ${device.name} 连接已断开`)
+              }
               // 清除定时发送命令
               if (device.commandInterval) {
                 clearInterval(device.commandInterval);
@@ -459,6 +464,8 @@ const connectDeviceForTest = async (device) => {
               device.connected = false;
               device.connecting = false;
               device.testResult = 'disconnected';
+              // 重置手动断开标记
+              device.isManuallyDisconnecting = false;
               updateTestStats();
             });
             
@@ -647,7 +654,10 @@ const connectDeviceForTest = async (device) => {
       
       // 设置超时并保存定时器引用
       const connectionTimeout = setTimeout(() => {
-        noble.removeListener('discover', deviceDiscoverListener)
+        // 确保deviceDiscoverListener是函数类型才移除
+        if (typeof deviceDiscoverListener === 'function') {
+          noble.removeListener('discover', deviceDiscoverListener)
+        }
         noble.stopScanning()
         device.connecting = false
         device.testResult = 'timeout' // 更新测试结果状态为超时
@@ -684,15 +694,25 @@ const disconnectDevice = (device) => {
       console.log(`已清除设备 ${device.name} 的定时发送命令`) 
     }
     
+    // 设置手动断开标记
+    device.isManuallyDisconnecting = true
+    
     const rawPeripheral = toRaw(device.peripheral)
+    // 移除旧的disconnect监听器，避免累积
+    rawPeripheral.removeAllListeners('disconnect')
+    
     rawPeripheral.disconnect(function(error) {
       if (error) {
         console.error(`断开设备 ${device.name} 失败:`, error)
+        // 重置手动断开标记
+        device.isManuallyDisconnecting = false
       } else {
         console.log(`设备 ${device.name} 已断开连接`)
         device.connected = false
         device.connecting = false
         device.testResult = 'disconnected'
+        // 重置手动断开标记
+        device.isManuallyDisconnecting = false
         updateTestStats()
       }
     })
@@ -708,6 +728,8 @@ const disconnectDevice = (device) => {
     device.connected = false
     device.connecting = false
     device.testResult = 'error'
+    // 重置手动断开标记
+    device.isManuallyDisconnecting = false
     updateTestStats()
   }
 }
@@ -715,6 +737,11 @@ const disconnectDevice = (device) => {
 // 重连设备
 const reconnectDevice = async (device) => {
   if (!device.id || !device.mac) return
+  
+  // 防止连续点击，如果正在连接中直接返回
+  if (device.connecting) {
+    return
+  }
   
   console.log(`正在重连设备 ${device.name}...`)
   
