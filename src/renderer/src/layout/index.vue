@@ -1,15 +1,12 @@
 <script setup>
-import Sidebar from './components/Sidebar/index.vue'
+import Sidebar from './components/SideBar.vue'
 </script>
 
 <template>
   <div class="common-layout">
-    <el-container>
-      <sidebar />
-      <el-container>
-        <!-- <el-header>Header</el-header> -->
-        <el-main><router-view></router-view></el-main>
-      </el-container>
+    <el-container class="full-height">
+      <Sidebar />
+      <el-main class="main-content"><router-view></router-view></el-main>
     </el-container>
   </div>
 </template>
@@ -17,5 +14,22 @@ import Sidebar from './components/Sidebar/index.vue'
 <style lang="scss" scoped>
 .common-layout {
   height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.full-height {
+  height: 100%;
+}
+
+.content-container {
+  height: 100%;
+  background-color: #0f172a;
+}
+
+.main-content {
+  padding: 0;
+  background-color: #0f172a;
+  overflow-y: auto;
 }
 </style>

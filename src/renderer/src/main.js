@@ -1,6 +1,7 @@
 import './assets/main.css'
 import './assets/iconfont/iconfont.css'
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'uno.css'
@@ -8,9 +9,11 @@ import router from '@router'
 import App from './App.vue'
 
 const app = createApp(App)
+const pinia = createPinia()
 
 app.use(ElementPlus)
 app.use(router)
+app.use(pinia)
 
 // 隐藏启动画面的函数
 const hideLoading = () => {
