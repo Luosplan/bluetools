@@ -68,33 +68,20 @@ export const useBluetoothStore = defineStore('bluetooth', {
       // 获取设置
     const settingsStore = useSettingsStore()
     const scanFilters = settingsStore.scanFilters
-    
+    console.log(scanFilters);
     // 定义设备发现监听器
       const deviceDiscoverListener = (peripheral) => {
+        console.log(peripheral.advertisement.localName);
         // 从广告数据中获取本地名称
         const deviceName = peripheral.advertisement.localName || ''
         
         // 1. 名称过滤
         let nameFilterPass = false
         if (scanFilters.nameFilters && scanFilters.nameFilters.length > 0) {
-          // 检查设备名称是否匹配任何一个名称过滤规则
+          // 检查设备名称是否包含任何一个名称过滤规则（不区分大小写）
           nameFilterPass = scanFilters.nameFilters.some(filter => {
-            if (filter.startsWith('*') && filter.endsWith('*')) {
-              // 包含匹配模式：*ecv02*
-              const keyword = filter.slice(1, -1)
-              return deviceName.includes(keyword)
-            } else if (filter.startsWith('*')) {
-              // 结尾匹配模式：*ecv02
-              const suffix = filter.slice(1)
-              return deviceName.endsWith(suffix)
-            } else if (filter.endsWith('*')) {
-              // 开头匹配模式：ecv02*
-              const prefix = filter.slice(0, -1)
-              return deviceName.startsWith(prefix)
-            } else {
-              // 精确匹配模式：ecv02
-              return deviceName === filter
-            }
+            // 转换为小写进行比较，实现不区分大小写的包含匹配
+            return deviceName.toLowerCase().includes(filter.toLowerCase())
           })
         } else {
           // 如果没有设置名称过滤规则，则不进行名称过滤
