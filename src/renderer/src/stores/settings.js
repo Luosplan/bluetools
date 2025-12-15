@@ -64,6 +64,12 @@ export const useSettingsStore = defineStore('settings', {
     // 保存设置到本地存储
     saveSettings() {
       try {
+        // 过滤掉名称过滤器中的空值
+        if (this.scanFilters.nameFilters && this.scanFilters.nameFilters.length > 1) {
+          this.scanFilters.nameFilters = this.scanFilters.nameFilters
+            .map(name => name?.trim() || '')
+            .filter(name => name !== '')
+        }
         localStorage.setItem('bluetools-settings', JSON.stringify(this.$state))
         console.log('设置已保存到本地存储')
       } catch (error) {

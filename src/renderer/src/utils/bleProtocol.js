@@ -8,20 +8,20 @@
  */
 export function convertMacAddressToHex(macAddress) {
   // 去除MAC地址中的冒号
-	let cleanedMac = macAddress.replace(/:/g, '');
-	// 检查去除冒号后的MAC地址长度是否为12
-	if (cleanedMac.length !== 12) {
-		return proxy.$modal.msgError('MAC地址有误');
-	}
-	// 将每个字符转换为ASCII码并转换为16进制
-	let asciiHex = '';
-	for (let i = 0; i < cleanedMac.length; i++) {
-		let charCode = cleanedMac.charCodeAt(i);
-		asciiHex += charCode.toString(16).padStart(2, '0').toUpperCase();
-	}
-	// 确保结果占用D0-D11，即长度为24个字符
-	let paddedAsciiHex = asciiHex.padEnd(24, '0');
-	return paddedAsciiHex;
+  let cleanedMac = macAddress.replace(/:/g, '')
+  // 检查去除冒号后的MAC地址长度是否为12
+  if (cleanedMac.length !== 12) {
+    return proxy.$modal.msgError('MAC地址有误')
+  }
+  // 将每个字符转换为ASCII码并转换为16进制
+  let asciiHex = ''
+  for (let i = 0; i < cleanedMac.length; i++) {
+    let charCode = cleanedMac.charCodeAt(i)
+    asciiHex += charCode.toString(16).padStart(2, '0').toUpperCase()
+  }
+  // 确保结果占用D0-D11，即长度为24个字符
+  let paddedAsciiHex = asciiHex.padEnd(24, '0')
+  return paddedAsciiHex
 }
 
 /**
@@ -30,8 +30,8 @@ export function convertMacAddressToHex(macAddress) {
  * @returns {string} - 反转后的十六进制字符串
  */
 export function decimalToHexadecimalReversed(decimal) {
-   if (decimal % 16 !== 0) {
-    decimal += (16 - (decimal % 16)); // 调整为下一个16的倍数
+  if (decimal % 16 !== 0) {
+    decimal += 16 - (decimal % 16) // 调整为下一个16的倍数
   }
   let hex = decimal.toString(16).toUpperCase().padStart(4, '0')
   let reversedHex = hex.substr(2, 2) + hex.substr(0, 2)
@@ -44,10 +44,10 @@ export function decimalToHexadecimalReversed(decimal) {
  * @returns {string} - 填充后的字符串
  */
 export function fillString(str) {
-  if(str.length % 16 !== 0) {
+  if (str.length % 16 !== 0) {
     const len = Math.ceil(str.length / 16)
-    let res = len*16 - str.length
-    return new Array(res).fill('F').join('') 
+    let res = len * 16 - str.length
+    return new Array(res).fill('F').join('')
   }
   return ''
 }
@@ -58,14 +58,14 @@ export function fillString(str) {
  * @returns {Uint8Array} - 字节数组
  */
 export function hexStringToByteArray(hexString) {
-  const len = hexString.length; 
-  const data = new Uint8Array(len / 2); 
-  for (let i = 0; i < len; i += 2) { 
-    // 将两个十六进制字符合并为一个字节，并转换为 Java 有符号 byte 表示 
-    const unsignedByte = parseInt(hexString.substring(i, i + 2), 16); 
-    data[i / 2] = toSignedByte(unsignedByte); 
+  const len = hexString.length
+  const data = new Uint8Array(len / 2)
+  for (let i = 0; i < len; i += 2) {
+    // 将两个十六进制字符合并为一个字节，并转换为 Java 有符号 byte 表示
+    const unsignedByte = parseInt(hexString.substring(i, i + 2), 16)
+    data[i / 2] = toSignedByte(unsignedByte)
   }
-  return data;
+  return data
 }
 
 /**
@@ -74,18 +74,18 @@ export function hexStringToByteArray(hexString) {
  * @returns {string} - CRC16校验和，十六进制字符串
  */
 export function crc16(source) {
-  let reg = intToByteArray(0xFFFF, 2)
-  let ploy = intToByteArray(0xFFFF, 2)
-  source.forEach(data => {
-    data = data & 0xFF
+  let reg = intToByteArray(0xffff, 2)
+  let ploy = intToByteArray(0xffff, 2)
+  source.forEach((data) => {
+    data = data & 0xff
     ploy[0] = reg[1]
     ploy[1] = reg[0]
     ploy[0] ^= data
-    reg = intToByteArray(byteArrayToInt(ploy) ^ ((byteArrayToInt(ploy) & 0xFF) >> 4), 2)
-    reg = intToByteArray(byteArrayToInt(reg) ^ (byteArrayToInt(reg) << 12), 2);
-    reg = intToByteArray(byteArrayToInt(reg) ^ ((byteArrayToInt(reg) & 0xFF) << 5), 2)
-  });
-  const reslut = reg.map(byte => byte.toString(16).toUpperCase().padStart(2, "0")).join("")
+    reg = intToByteArray(byteArrayToInt(ploy) ^ ((byteArrayToInt(ploy) & 0xff) >> 4), 2)
+    reg = intToByteArray(byteArrayToInt(reg) ^ (byteArrayToInt(reg) << 12), 2)
+    reg = intToByteArray(byteArrayToInt(reg) ^ ((byteArrayToInt(reg) & 0xff) << 5), 2)
+  })
+  const reslut = reg.map((byte) => byte.toString(16).toUpperCase().padStart(2, '0')).join('')
   return reslut
 }
 
@@ -95,13 +95,13 @@ export function crc16(source) {
  * @returns {Buffer} - Buffer对象
  */
 export function hexStringToBuffer(hexString) {
-  const buffer = Buffer.alloc(hexString.length / 2); 
-  for (let i = 0; i < hexString.length; i += 2) { 
-    // 将两个十六进制字符合并为一个字节 
-    const byte = parseInt(hexString.substring(i, i + 2), 16); 
-    buffer[i / 2] = byte;
+  const buffer = Buffer.alloc(hexString.length / 2)
+  for (let i = 0; i < hexString.length; i += 2) {
+    // 将两个十六进制字符合并为一个字节
+    const byte = parseInt(hexString.substring(i, i + 2), 16)
+    buffer[i / 2] = byte
   }
-  return buffer;
+  return buffer
 }
 
 /**
@@ -111,16 +111,16 @@ export function hexStringToBuffer(hexString) {
  * @returns {Buffer[]} - 拆分后的包数组
  */
 export function splitDataIntoPackets(data, packetSize = 20) {
-  const packets = [];
-  const dataLength = data.length;
-  
+  const packets = []
+  const dataLength = data.length
+
   for (let i = 0; i < dataLength; i += packetSize) {
-    const end = Math.min(i + packetSize, dataLength);
-    const packet = data.slice(i, end);
-    packets.push(packet);
+    const end = Math.min(i + packetSize, dataLength)
+    const packet = data.slice(i, end)
+    packets.push(packet)
   }
-  
-  return packets;
+
+  return packets
 }
 
 /**
@@ -264,7 +264,7 @@ export function buildCloseValveCmd(options, packetSize = 40) {
   const dataToCheck = Object.values(dataCmd).join('')
   const byteArray = hexStringToByteArray(dataToCheck)
   dataCmd.cs = crc16(byteArray)
-  
+
   // 构建完整命令
   const head = 'AA'
   const end = '55'
@@ -287,12 +287,12 @@ export function parseReadRealtimeDataResponse(response) {
   // 转换为十六进制字符串进行处理
   const hexString = arrayBufferToHex(response)
   const dataStr = hexString.substr(98, 32)
-  if(hexString.slice(6).includes('b0')) {
+  if (hexString.slice(6).includes('b0')) {
     const rsData = parseDataField(dataStr)
     // 返回解析后的数据，不包含firmwareVersion字段
     return rsData
-  }else {
-    console.log(hexString);
+  } else {
+    console.log(hexString)
     // 开关阀解析
     return {}
   }
@@ -327,17 +327,17 @@ function parseDataField(dataField) {
  * @returns {Uint8Array} - Uint8Array对象
  */
 function hexStringToUint8Array(hexString) {
-  const bytes = new Uint8Array(hexString.length / 2);
+  const bytes = new Uint8Array(hexString.length / 2)
   for (let i = 0; i < hexString.length; i += 2) {
-    bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(hexString.substr(i, 2), 16)
   }
-  return bytes;
+  return bytes
 }
 
 const arrayBufferToHex = (buffer) => {
   const hexString = Array.from(buffer)
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
   return hexString
 }
 
@@ -349,44 +349,44 @@ const arrayBufferToHex = (buffer) => {
 export function parseDeviceData(data) {
   // 将十六进制字符串转换为Uint8Array，然后创建DataView
   const bytes = hexStringToUint8Array(data)
-  const view = new DataView(bytes.buffer);
-  
+  const view = new DataView(bytes.buffer)
+
   // 解析基本数据
-  const flowValue = view.getFloat32(0, true);
-  const pressureValue = view.getUint32(4, true);
-  
+  const flowValue = view.getFloat32(0, true)
+  const pressureValue = view.getUint32(4, true)
+
   // 格式化流量值：0时显示"0"，非0时保留3位小数，null时显示"--"
   const formatFlowValue = (value) => {
-    if (value === null || value === undefined) return null;
-    return value === 0 ? '0' : value.toFixed(3);
-  };
-  
+    if (value === null || value === undefined) return null
+    return value === 0 ? '0' : value.toFixed(3)
+  }
+
   // 格式化压力值：0时显示"0"，非0时保留3位小数，null时显示"--"
   const formatPressureValue = (value) => {
-    if (value === null || value === undefined) return null;
-    return value === 0 ? '0' : value.toFixed(3);
-  };
-  
+    if (value === null || value === undefined) return null
+    return value === 0 ? '0' : value.toFixed(3)
+  }
+
   let parsedData = {
     peakExpiratoryFlow: formatFlowValue(flowValue), // 流量值(4字节，Float类型，小端字节序)
     meterPressure: formatPressureValue(pressureValue), // 绝压值(4字节，uint32类型，小端字节序)
     temperature: view.getInt16(8, true) / 100, // 温度值(2字节，int16类型，放大100倍，小端字节序)
-    batteryVoltage: view.getUint16(10, true) / 100, // 电池电压(2字节，uint16类型，放大100倍，小端字节序)
-  };
-  
+    batteryVoltage: view.getUint16(10, true) / 100 // 电池电压(2字节，uint16类型，放大100倍，小端字节序)
+  }
+
   // 解析设备状态 (2字节，小端字节序)
-  const low = bytes[12];
-  const high = bytes[13];
-  const bits = (high << 8) | low; // 小端：低字节在前，高字节在后
-  
+  const low = bytes[12]
+  const high = bytes[13]
+  const bits = (high << 8) | low // 小端：低字节在前，高字节在后
+
   // 流体介质映射
   const fluidMediumMap = {
-    0: "空气",
-    1: "天然气",
-    2: "液化石油气",
-    3: "预留"
-  };
-  
+    0: '空气',
+    1: '天然气',
+    2: '液化石油气',
+    3: '预留'
+  }
+
   // 设备状态映射
   const deviceStatus = {
     valveStatus: String((bits >> 0) & 1), // 阀门状态
@@ -403,35 +403,35 @@ export function parseDeviceData(data) {
     underPressure: String((bits >> 11) & 1), // 欠压
     pressureSensorFault: String((bits >> 12) & 1), // 压力传感器故障
     flowSensorFault: String((bits >> 13) & 1), // 流量传感器故障
-    fluidMedium: fluidMediumMap[(bits >> 14) & 0x03] || "未知" // 流体介质
-  };
-  
+    fluidMedium: fluidMediumMap[(bits >> 14) & 0x03] || '未知' // 流体介质
+  }
+
   // 合并数据
-  parsedData = { ...parsedData, ...deviceStatus };
-  
+  parsedData = { ...parsedData, ...deviceStatus }
+
   // 构建报警字符串
   const alarmMap = {
-    leakAlarm: "报警器泄漏报警",
-    pipelineLeak: "管道泄漏报警",
-    microFlow: "微流报警",
-    constantFlow1: "恒流1报警",
-    constantFlow2: "恒流2报警",
-    constantFlow3: "恒流3报警",
-    constantFlow4: "恒流4报警",
-    overFlow: "超流报警",
-    overTemp: "超温报警",
-    overPressure: "超压报警",
-    underPressure: "欠压报警",
-    pressureSensorFault: "压力传感器故障",
-    flowSensorFault: "流量传感器故障"
-  };
-  
+    leakAlarm: '报警器泄漏报警',
+    pipelineLeak: '管道泄漏报警',
+    microFlow: '微流报警',
+    constantFlow1: '恒流1报警',
+    constantFlow2: '恒流2报警',
+    constantFlow3: '恒流3报警',
+    constantFlow4: '恒流4报警',
+    overFlow: '超流报警',
+    overTemp: '超温报警',
+    overPressure: '超压报警',
+    underPressure: '欠压报警',
+    pressureSensorFault: '压力传感器故障',
+    flowSensorFault: '流量传感器故障'
+  }
+
   parsedData.alarmStr = Object.entries(alarmMap)
     .filter(([key]) => deviceStatus[key] === '1')
     .map(([, msg]) => msg)
-    .join("、");
-  
-  return parsedData;
+    .join('、')
+
+  return parsedData
 }
 
 /**
@@ -441,18 +441,18 @@ export function parseDeviceData(data) {
  */
 export function parseDeviceStatus(status) {
   // 将16位状态值转换为小端字节序处理
-  const low = status & 0xFF;
-  const high = (status >> 8) & 0xFF;
-  const bits = (high << 8) | low; // 小端：低字节在前，高字节在后
-  
+  const low = status & 0xff
+  const high = (status >> 8) & 0xff
+  const bits = (high << 8) | low // 小端：低字节在前，高字节在后
+
   // 流体介质映射
   const fluidMediumMap = {
-    0: "空气",
-    1: "天然气",
-    2: "液化石油气",
-    3: "预留"
-  };
-  
+    0: '空气',
+    1: '天然气',
+    2: '液化石油气',
+    3: '预留'
+  }
+
   return {
     valveStatus: String((bits >> 0) & 1), // 阀门状态: 0-关闭, 1-打开
     leakAlarm: String((bits >> 1) & 1), // 报警器泄漏报警: 0-正常, 1-泄漏
@@ -468,8 +468,8 @@ export function parseDeviceStatus(status) {
     underPressure: String((bits >> 11) & 1), // 欠压: 0-正常, 1-报警
     pressureSensorFault: String((bits >> 12) & 1), // 压力传感器故障: 0-正常, 1-故障
     flowSensorFault: String((bits >> 13) & 1), // 流量传感器故障: 0-正常, 1-故障
-    fluidMedium: fluidMediumMap[(bits >> 14) & 0x03] || "未知" // 流体介质类型
-  };
+    fluidMedium: fluidMediumMap[(bits >> 14) & 0x03] || '未知' // 流体介质类型
+  }
 }
 
 /**
@@ -513,9 +513,9 @@ export function calculateChecksum(data) {
  */
 function toSignedByte(unsignedByte) {
   if (unsignedByte > 127) {
-    return unsignedByte - 256;
+    return unsignedByte - 256
   }
-  return unsignedByte;
+  return unsignedByte
 }
 
 /**
@@ -525,11 +525,11 @@ function toSignedByte(unsignedByte) {
  * @returns {Array} - 字节数组
  */
 function intToByteArray(value, length) {
-  const bytes = [];
+  const bytes = []
   for (let i = 0; i < length; i++) {
-    bytes[i] = (value >> (i * 8)) & 0xFF;
+    bytes[i] = (value >> (i * 8)) & 0xff
   }
-  return bytes;
+  return bytes
 }
 
 /**
@@ -538,9 +538,9 @@ function intToByteArray(value, length) {
  * @returns {number} - 转换后的整数
  */
 function byteArrayToInt(byteArray) {
-  let value = 0;
+  let value = 0
   for (let i = 0; i < byteArray.length; i++) {
-    value |= (byteArray[i] & 0xFF) << (i * 8);
+    value |= (byteArray[i] & 0xff) << (i * 8)
   }
-  return value;
+  return value
 }

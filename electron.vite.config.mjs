@@ -18,7 +18,7 @@ export default defineConfig({
         '@views': resolve('src/renderer/src/views'),
         '@utils': resolve('src/renderer/src/utils'),
         '@assets': resolve('src/renderer/src/assets'),
-        '@stores': resolve('src/renderer/src/stores'),
+        '@stores': resolve('src/renderer/src/stores')
       },
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue']
     },

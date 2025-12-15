@@ -110,7 +110,7 @@ export const useBluetoothStore = defineStore('bluetooth', {
             // 新设备，添加到列表
             const device = {
               id: peripheral.id,
-              name: deviceName,
+              name: deviceName || `未知设备_${this.bluetoothDevices.length + 1}`,
               mac: peripheral.address || '未知',
               rssi: peripheral.rssi
             }

@@ -1,8 +1,9 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 // 导入pinia store
 import { useSettingsStore } from '../../stores/settings'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 使用pinia store
 const settingsStore = useSettingsStore()
@@ -35,40 +36,43 @@ const updateStatus = reactive({
 })
 
 // 保存设置
-const saveSettings = () => {
-  // 获取当前保存的设置，用于恢复空值
-  let currentServices = settingsStore.bluetoothServices || {}
-  
-  // 校验蓝牙服务设置，确保不为空
-  const validatedSettings = { ...settings.value }
-  
-  // 主服务校验
-  if (!validatedSettings.bluetoothServices.mainService?.trim()) {
-    validatedSettings.bluetoothServices.mainService = currentServices.mainService || '0000fe60-0000-1000-8000-00805f9b34fb'
+  const saveSettings = () => {
+    // 获取当前保存的设置，用于恢复空值
+    let currentServices = settingsStore.bluetoothServices || {}
+    
+    // 校验蓝牙服务设置，确保不为空
+    const validatedSettings = { ...settings.value }
+    
+    // 主服务校验
+    if (!validatedSettings.bluetoothServices.mainService?.trim()) {
+      validatedSettings.bluetoothServices.mainService = currentServices.mainService || '0000fe60-0000-1000-8000-00805f9b34fb'
+    }
+    
+    // 写入特征校验
+    if (!validatedSettings.bluetoothServices.writeCharacteristic?.trim()) {
+      validatedSettings.bluetoothServices.writeCharacteristic = currentServices.writeCharacteristic || '0000fe61-0000-1000-8000-00805f9b34fb'
+    }
+    
+    // 监听特征校验
+    if (!validatedSettings.bluetoothServices.notifyCharacteristic?.trim()) {
+      validatedSettings.bluetoothServices.notifyCharacteristic = currentServices.notifyCharacteristic || '0000fe62-0000-1000-8000-00805f9b34fb'
+    }
+    
+    // 将所有蓝牙服务值转为小写
+    validatedSettings.bluetoothServices.mainService = validatedSettings.bluetoothServices.mainService.toLowerCase()
+    validatedSettings.bluetoothServices.writeCharacteristic = validatedSettings.bluetoothServices.writeCharacteristic.toLowerCase()
+    validatedSettings.bluetoothServices.notifyCharacteristic = validatedSettings.bluetoothServices.notifyCharacteristic.toLowerCase()
+    
+    // 过滤名称过滤列表中的空字符串
+    validatedSettings.scanFilters.nameFilters = validatedSettings.scanFilters.nameFilters.filter(name => name.trim())
+    
+    // 更新本地设置
+    settings.value = validatedSettings
+    
+    // 使用pinia store保存设置
+    settingsStore.$patch(validatedSettings)
+    settingsStore.saveSettings()
   }
-  
-  // 写入特征校验
-  if (!validatedSettings.bluetoothServices.writeCharacteristic?.trim()) {
-    validatedSettings.bluetoothServices.writeCharacteristic = currentServices.writeCharacteristic || '0000fe61-0000-1000-8000-00805f9b34fb'
-  }
-  
-  // 监听特征校验
-  if (!validatedSettings.bluetoothServices.notifyCharacteristic?.trim()) {
-    validatedSettings.bluetoothServices.notifyCharacteristic = currentServices.notifyCharacteristic || '0000fe62-0000-1000-8000-00805f9b34fb'
-  }
-  
-  // 将所有蓝牙服务值转为小写
-  validatedSettings.bluetoothServices.mainService = validatedSettings.bluetoothServices.mainService.toLowerCase()
-  validatedSettings.bluetoothServices.writeCharacteristic = validatedSettings.bluetoothServices.writeCharacteristic.toLowerCase()
-  validatedSettings.bluetoothServices.notifyCharacteristic = validatedSettings.bluetoothServices.notifyCharacteristic.toLowerCase()
-  
-  // 更新本地设置
-  settings.value = validatedSettings
-  
-  // 使用pinia store保存设置
-  settingsStore.$patch(validatedSettings)
-  settingsStore.saveSettings()
-}
 
 // 加载设置
 const loadSettings = () => {
@@ -107,7 +111,6 @@ const checkForUpdates = () => {
 // 添加过滤名称
 const addFilterName = () => {
   settings.value.scanFilters.nameFilters.push('')
-  saveSettings()
 }
 
 // 移除过滤名称
@@ -120,10 +123,11 @@ const removeFilterName = (index) => {
 
 // 重置设置
 const clearSettings = () => {
-  if (confirm('确定要重置所有设置吗？此操作不可恢复。')) {
-    // 使用pinia store重置设置
+  ElMessageBox.confirm('确定要重置所有设置吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  }).then(() => {
     settingsStore.resetSettings()
-    
     // 更新本地设置
     settings.value = {
       general: settingsStore.general,
@@ -137,18 +141,26 @@ const clearSettings = () => {
         nameFilters: ['ecv02']
       }
     }
-  }
+    ElMessage.success('所有设置已重置')
+  }).catch(() => {
+    // 用户点击取消，不执行任何操作
+  })
 }
 
 // 组件挂载时加载设置
 onMounted(() => {
   loadSettings()
 })
+
+// 组件卸载时保存设置
+onUnmounted(() => {
+  saveSettings()
+})
 </script>
 
 <template>
   <div class="h-full bg-gradient-to-br from-[#0f172a] to-[#1e293b] flex justify-center overflow-y-auto">
-    <div class="w-full max-w-2xl px-6 pt-4 pb-10 space-y-6">
+    <div  class="w-full h-fit max-w-2xl py-6 space-y-6">
       <h2 class="text-2xl font-light text-white mb-6">设置</h2>
 
       <!-- 蓝牙服务设置 -->
@@ -229,21 +241,21 @@ onMounted(() => {
             </div>
           </div>
           
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between p-2">
             <div>
               <div class="text-sm font-medium text-white">Bluetooth Tool</div>
               <div class="text-xs text-slate-500">Version {{ appVersion }} (Build {{ buildTime }})</div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-3">
               <button 
-                class="border-none px-4 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md transition"
+                class="border-none px-5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md transition"
                 :disabled="updateStatus.checking || updateStatus.downloading"
                 @click="checkForUpdates"
               >
                 {{ updateStatus.checking ? '检查中...' : updateStatus.downloading ? '下载中...' : '检查更新' }}
               </button>
               <button 
-                class="border-none px-4 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded-md transition"
+                class="border-none px-5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs rounded-md transition"
                 @click="clearSettings"
               >
                 重置设置

@@ -321,12 +321,7 @@ onBeforeUnmount(() => {
     <!-- 1. 主布局 -->
     <!-- <main class="flex-1 flex overflow-hidden relative"> -->
       <!-- 内容区域 -->
-      <section class="flex-1 bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-6 relative">
-        <!-- 装饰背景 -->
-        <div
-          class="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none">
-        </div>
-
+      <section class="flex-1 bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-6 overflow-hidden relative">
         <!-- PAGE 1: 设备录入 (多种模式) -->
         <div class="h-full flex flex-col gap-6 max-w-6xl mx-auto overflow-hidden">
           <!-- 录入模式切换 Tab -->
@@ -340,7 +335,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="flex-1 flex gap-6">
+          <div class="flex-1 flex gap-6 overflow-hidden">
             <!-- 左侧：操作区 -->
             <div
               class="flex-1 glass-panel rounded-2xl p-6 relative flex flex-col items-center justify-center border-t border-white/10">
@@ -413,7 +408,7 @@ onBeforeUnmount(() => {
                     </button>
                   </div>
                 </div>
-                <div class="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[350px]">
+                <div class="flex-1 overflow-y-auto space-y-2 pr-2">
                   <div v-if="bluetoothStore.bluetoothDevices.length === 0" class="flex items-center justify-center h-full text-slate-500 text-sm">
                     {{ bluetoothStore.isScanning ? '正在搜索...' : '点击刷新列表搜索设备' }}
                   </div>
@@ -506,6 +501,6 @@ onBeforeUnmount(() => {
 }
 
 .code-font {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'JetBrains Mono', monospace;
 }
 </style>
