@@ -162,13 +162,18 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
+  // 设置云服务器作为更新源 (generic provider)
+  // 服务器上需要放置: latest.yml, *.exe, *.blockmap 文件
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: 'http://8.136.42.240/'
+  })
+
   // 打印初始配置信息
   console.log('[autoUpdater] 初始化完成，当前版本:', app.getVersion())
   console.log('[autoUpdater] 更新服务器配置:', {
-    provider: 'github',
-    owner: 'Luosplan',
-    repo: 'bluetools',
-    vPrefixedTagName: true
+    provider: 'generic',
+    url: 'http://8.136.42.240/'
   })
 
   // 监听更新检查开始
