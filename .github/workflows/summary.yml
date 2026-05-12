@@ -49,7 +49,7 @@ jobs:
       # ====================== 关键新增步骤 解决自动更新需要科学上网======================
       # 自动把更新文件传到你的国内云服务器
       - name: Upload to Server via SCP
-        uses: carlosperate/upload-file-to-scp@v1
+        uses: appleboy/scp-action@v0.1.7
         with:
           local-files: |
             dist/*.exe
