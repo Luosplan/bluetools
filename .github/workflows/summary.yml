@@ -7,7 +7,7 @@ on:
 jobs:
   Release:
     name: build and release Electron app
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +49,7 @@ jobs:
       # ====================== 关键新增步骤 解决自动更新需要科学上网======================
       # 自动把更新文件传到你的国内云服务器
       - name: 上传更新文件到云服务器
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7
         with:
           # 你需要在 GitHub Secrets 里配置这 4 个信息
           host: ${{ secrets.SERVER_HOST }}       # 你的服务器IP
