@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ipcRenderer } from 'electron'
+
+// 在渲染进程中，必须通过 window.ipcRenderer 访问，不能直接导入
+const ipcRenderer = window.ipcRenderer
 
 export const useUpdaterStore = defineStore('updater', {
   state: () => ({
