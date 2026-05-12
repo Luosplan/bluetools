@@ -5,9 +5,10 @@ on:
        - 'v*.*.*'  # 版本标签推送时触发发布
 
 jobs:
+  # 任务1：构建
   Release:
     name: build and release Electron app
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
@@ -46,16 +47,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ====================== 关键新增步骤 解决自动更新需要科学上网======================
-      # 自动把更新文件传到你的国内云服务器
-      - name: Upload to Server via SCP
+  # 任务2：Linux 下载并上传到服务器
+  upload-to-server:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./dist
+
+      - name: Upload to 宝塔服务器
         uses: appleboy/scp-action@v0.1.7
         with:
-          local-files: |
-            dist/*.exe
-            dist/*.blockmap
-            dist/latest.yml
-          remote-host: ${{ secrets.SERVER_HOST }}
-          remote-user: ${{ secrets.SERVER_USER }}
-          remote-dir: /www/wwwroot/bluetools/
-          ssh-private-key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "./dist/*"
+          target: "/www/wwwroot/bluetools"
+          strip_components: 1
+          overwrite: true
