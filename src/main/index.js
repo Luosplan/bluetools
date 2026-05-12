@@ -105,7 +105,18 @@ function createWindow() {
     } else {
       // 生产环境中实际调用检查更新
       console.log('生产环境：开始检查更新')
-      autoUpdater.checkForUpdates()
+      console.log('当前版本:', appVersion)
+      console.log('autoUpdater 配置:', autoUpdater.validateOptions())
+      console.log('更新源 URL:', autoUpdater.getFeedURL())
+      try {
+        autoUpdater.checkForUpdates().then(result => {
+          console.log('checkForUpdates 完成, result:', result)
+        }).catch(err => {
+          console.error('checkForUpdates 错误:', err)
+        })
+      } catch (error) {
+        console.error('调用 autoUpdater.checkForUpdates 失败:', error)
+      }
     }
   })
 
