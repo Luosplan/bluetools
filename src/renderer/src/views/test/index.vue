@@ -1,7 +1,11 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, toRaw } from 'vue'
 import { ElMessage as Toast } from 'element-plus'
 import { Delete, Pointer } from '@element-plus/icons-vue'
+// 导入蓝牙协议工具函数
+import { buildReadRealtimeDataCmd, parseReadRealtimeDataResponse, buildOpenValveCmd, buildCloseValveCmd } from '../../utils/bleProtocol'
+// 导入UUID转换工具函数
+import { convertTo128BitUUID } from '../../utils/common'
 // 导入pinia store
 import { useBluetoothStore } from '../../stores/bluetooth'
 import { useSettingsStore } from '../../stores/settings'
@@ -36,56 +40,40 @@ const updateTestProgress = () => {
 
 // 设备操作函数
 const reconnectDevice = async (dev) => {
+  // 防止连续点击，如果正在连接中直接返回
+  if (dev.connecting) {
+    return
+  }
+
+  // 清除可能存在的旧的定时发送命令
+  if (dev.commandInterval) {
+    clearInterval(dev.commandInterval)
+    dev.commandInterval = null
+    console.log(`已清除设备 ${dev.name} 的旧定时发送命令`)
+  }
+
   // 更新设备状态
   bluetoothStore.$patch(state => {
     const updatedDevice = state.devices.find(d => d.id === dev.id)
     if (updatedDevice) {
       updatedDevice.connecting = true
       updatedDevice.connected = false
+      updatedDevice.testResult = 'pending'
     }
   })
-  
+
   try {
-    // 实际连接设备
-    await connectDevice(dev)
-    
-    bluetoothStore.$patch(state => {
-      const updatedDevice = state.devices.find(d => d.id === dev.id)
-      if (updatedDevice) {
-        updatedDevice.connecting = false
-        updatedDevice.connected = true
-        updatedDevice.dataTime = new Date().toLocaleTimeString()
-      }
-    })
+    // 调用bluetoothStore的connectDevice方法连接设备
+    await bluetoothStore.connectDevice(dev.id)
     
     updateTestProgress()
-    Toast.success(`${dev.name} 重新连接成功`)
   } catch (error) {
     console.error(`连接设备 ${dev.name} 失败:`, error)
-    
-    bluetoothStore.$patch(state => {
-      const updatedDevice = state.devices.find(d => d.id === dev.id)
-      if (updatedDevice) {
-        updatedDevice.connecting = false
-        updatedDevice.connected = false
-        updatedDevice.testResult = 'failed'
-      }
-    })
-    
     updateTestProgress()
-    Toast.error(`${dev.name} 重新连接失败`)
   }
 }
 
-// 连接设备 - 使用bluetoothStore的connectDevice方法
-const connectDevice = async (device) => {
-  try {
-    await bluetoothStore.connectDevice(device)
-  } catch (error) {
-    console.error(`连接设备 ${device.name} 失败:`, error)
-    throw error
-  }
-}
+// 数据读取功能已经在bluetoothStore中实现，不需要在这里重复实现
 
 // 开阀操作 - 使用bluetoothStore的openValve方法
 const openValve = (dev) => {
@@ -93,7 +81,7 @@ const openValve = (dev) => {
     return Toast.warning('设备未连接，无法操作')
   }
   
-  bluetoothStore.openValve(dev)
+  bluetoothStore.openValve(dev.id)
 }
 
 // 关阀操作 - 使用bluetoothStore的closeValve方法
@@ -102,7 +90,7 @@ const closeValve = (dev) => {
     return Toast.warning('设备未连接，无法操作')
   }
   
-  bluetoothStore.closeValve(dev)
+  bluetoothStore.closeValve(dev.id)
 }
 
 // 断开设备连接 - 使用bluetoothStore的disconnectDevice方法
@@ -111,7 +99,7 @@ const disconnectDevice = (dev) => {
     return Toast.warning('设备未连接')
   }
   
-  bluetoothStore.disconnectDevice(dev)
+  bluetoothStore.disconnectDevice(dev.id)
   updateTestProgress()
 }
 
@@ -119,7 +107,7 @@ const completeDeviceTest = (dev) => {
   if (!dev.connected) {
     return Toast.warning('设备未连接，无法完成测试')
   }
-  Toast.success(`${dev.name} 测试完成`)
+  bluetoothStore.completeDeviceTest(dev.id)
 }
 
 // 移除设备 - 使用bluetoothStore的removeDevice方法

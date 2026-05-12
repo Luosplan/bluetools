@@ -68,10 +68,8 @@ export const useBluetoothStore = defineStore('bluetooth', {
       // 获取设置
     const settingsStore = useSettingsStore()
     const scanFilters = settingsStore.scanFilters
-    console.log(scanFilters);
     // 定义设备发现监听器
       const deviceDiscoverListener = (peripheral) => {
-        console.log(peripheral.advertisement.localName);
         // 从广告数据中获取本地名称
         const deviceName = peripheral.advertisement.localName || ''
         
@@ -122,7 +120,7 @@ export const useBluetoothStore = defineStore('bluetooth', {
       // 15秒后自动停止扫描
       setTimeout(() => {
         this.stopScan()
-      }, 15000)
+      }, 30000)
     },
 
     // 停止扫描设备
@@ -306,8 +304,8 @@ export const useBluetoothStore = defineStore('bluetooth', {
                       let notifyChar = null
                       
                       // 获取并转换目标特征UUID
-                      const targetWriteUUID = '0000fff3-0000-1000-8000-00805f9b34fb' // 写入特征UUID
-                      const targetNotifyUUID = '0000fff4-0000-1000-8000-00805f9b34fb' // 通知特征UUID
+                      const targetWriteUUID = settings.value.bluetoothServices.writeCharacteristic // 写入特征UUID
+                      const targetNotifyUUID = settings.value.bluetoothServices.notifyCharacteristic // 通知特征UUID
                       
                       // 遍历所有服务和特征，找到目标特征
                       for (const serviceWithChar of servicesWithChars) {
@@ -379,17 +377,50 @@ export const useBluetoothStore = defineStore('bluetooth', {
                           } else {
                             console.log(`设备 ${device.name} 通知已启用`)
                             
-                            // 开始定时发送读取实时数据命令
-                            device.commandInterval = setInterval(() => {
-                              if (device.connected && device.writeCharacteristic) {
-                                const cmd = buildReadRealtimeDataCmd()
-                                device.writeCharacteristic.write(Buffer.from(cmd), false, (err) => {
-                                  if (err) {
-                                    console.error(`设备 ${device.name} 发送命令失败:`, err)
-                                  }
-                                })
+                            // 构建并发送读取实时数据命令
+                            const sendReadDataCmd = () => {
+                              // 检查设备是否连接
+                              if (!device.connected || !device.writeCharacteristic) {
+                                console.warn(`设备 ${device.name} 未连接，跳过发送命令`)
+                                return
                               }
-                            }, 1000) // 每秒发送一次
+                               
+                              try {
+                                const cmds = buildReadRealtimeDataCmd(device)
+                                let sentCount = 0
+                                
+                                // 递归发送数据包，确保按顺序发送
+                                const sendNextPacket = () => {
+                                  if (sentCount >= cmds.length) {
+                                    // 所有数据包发送完毕，可以开始处理监听数据
+                                    return
+                                  }
+                                  
+                                  const cmd = cmds[sentCount]
+                                  const packetIndex = sentCount + 1
+                                  
+                                  writeChar.write(cmd, false, (error) => {
+                                    if (error) {
+                                      console.error(`设备 ${device.name} 发送命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+                                    } else {
+                                      // 发送成功后，继续发送下一个包
+                                      sentCount++
+                                      sendNextPacket()
+                                    }
+                                  })
+                                }
+                                
+                                // 开始发送第一个包
+                                sendNextPacket()
+                              } catch (error) {
+                                console.error(`设备 ${device.name} 发送命令失败:`, error)
+                              }
+                            }
+                            
+                            // 设置定时发送命令（每10秒一次）
+                            device.commandInterval = setInterval(sendReadDataCmd, 10000)
+                            // 立即发送一次命令
+                            sendReadDataCmd()
                           }
                         })
                       } else {
@@ -490,49 +521,108 @@ export const useBluetoothStore = defineStore('bluetooth', {
     // 开阀操作
     openValve(deviceId) {
       const device = this.devices.find(d => d.id === deviceId)
-      if (!device || !device.connected) {
+      if (!device || !device.connected || !device.writeCharacteristic) {
         Toast.warning('设备未连接，无法操作')
         return
       }
       
-      if (device.writeCharacteristic) {
-        const cmd = buildOpenValveCmd()
-        device.writeCharacteristic.write(Buffer.from(cmd), false, (err) => {
-          if (err) {
-            console.error(`设备 ${device.name} 发送开阀命令失败:`, err)
-            Toast.error(`${device.name} 开阀失败`)
-          } else {
-            console.log(`设备 ${device.name} 开阀命令发送成功`)
+      console.log(`打开设备 ${device.name} 的阀门...`)
+      
+      try {
+        // 使用device获取writeCharacteristic
+        const writeChar = device.writeCharacteristic
+        
+        // 构建开阀命令
+        const cmds = buildOpenValveCmd(device)
+        let sentCount = 0
+        
+        // 递归发送数据包，确保按顺序发送
+        const sendNextPacket = () => {
+          if (sentCount >= cmds.length) {
+            console.log(`设备 ${device.name} 所有开阀命令包发送完毕`)
+            // 发送成功后，先更新UI显示的阀门状态
             this.updateDeviceState(deviceId, { valveStatus: '开启' })
             Toast.success(`${device.name} 阀门已打开`)
+            return
           }
-        })
+          
+          const cmd = cmds[sentCount]
+          const packetIndex = sentCount + 1
+          
+          // 发送开阀命令包
+          writeChar.write(cmd, false, (error) => {
+            if (error) {
+              console.error(`设备 ${device.name} 发送开阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+              Toast.error(`${device.name} 开阀失败`)
+            } else {
+              console.log(`设备 ${device.name} 已发送开阀命令包 ${packetIndex}/${cmds.length}`)
+              // 发送成功后，继续发送下一个包
+              sentCount++
+              sendNextPacket()
+            }
+          })
+        }
+        
+        // 开始发送第一个包
+        sendNextPacket()
+      } catch (error) {
+        console.error(`设备 ${device.name} 构建开阀命令失败:`, error)
+        Toast.error(`${device.name} 开阀失败`)
       }
     },
 
     // 关阀操作
     closeValve(deviceId) {
       const device = this.devices.find(d => d.id === deviceId)
-      if (!device || !device.connected) {
+      if (!device || !device.connected || !device.writeCharacteristic) {
         Toast.warning('设备未连接，无法操作')
         return
       }
       
-      if (device.writeCharacteristic) {
-        const cmd = buildCloseValveCmd()
-        device.writeCharacteristic.write(Buffer.from(cmd), false, (err) => {
-          if (err) {
-            console.error(`设备 ${device.name} 发送关阀命令失败:`, err)
-            Toast.error(`${device.name} 关阀失败`)
-          } else {
-            console.log(`设备 ${device.name} 关阀命令发送成功`)
+      console.log(`关闭设备 ${device.name} 的阀门...`)
+      
+      try {
+        // 使用device获取writeCharacteristic
+        const writeChar = device.writeCharacteristic
+        
+        // 构建关阀命令
+        const cmds = buildCloseValveCmd(device)
+        let sentCount = 0
+        
+        // 递归发送数据包，确保按顺序发送
+        const sendNextPacket = () => {
+          if (sentCount >= cmds.length) {
+            console.log(`设备 ${device.name} 所有关阀命令包发送完毕`)
+            // 发送成功后，先更新UI显示的阀门状态
             this.updateDeviceState(deviceId, { valveStatus: '关闭' })
             Toast.success(`${device.name} 阀门已关闭`)
+            return
           }
-        })
+          
+          const cmd = cmds[sentCount]
+          const packetIndex = sentCount + 1
+          
+          // 发送关阀命令包
+          writeChar.write(cmd, false, (error) => {
+            if (error) {
+              console.error(`设备 ${device.name} 发送关阀命令包 ${packetIndex}/${cmds.length} 失败:`, error)
+              Toast.error(`${device.name} 关阀失败`)
+            } else {
+              console.log(`设备 ${device.name} 已发送关阀命令包 ${packetIndex}/${cmds.length}`)
+              // 发送成功后，继续发送下一个包
+              sentCount++
+              sendNextPacket()
+            }
+          })
+        }
+        
+        // 开始发送第一个包
+        sendNextPacket()
+      } catch (error) {
+        console.error(`设备 ${device.name} 构建关阀命令失败:`, error)
+        Toast.error(`${device.name} 关阀失败`)
       }
     },
-
     // 完成设备测试
     completeDeviceTest(deviceId) {
       const device = this.devices.find(d => d.id === deviceId)

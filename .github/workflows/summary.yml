@@ -45,3 +45,21 @@ jobs:
             dist/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ====================== 关键新增步骤 解决自动更新需要科学上网======================
+      # 自动把更新文件传到你的国内云服务器
+      - name: 上传更新文件到云服务器
+        uses: appleboy/scp-action@master
+        with:
+          # 你需要在 GitHub Secrets 里配置这 4 个信息
+          host: ${{ secrets.SERVER_HOST }}       # 你的服务器IP
+          username: ${{ secrets.SERVER_USER }}   # 登录用户名，如 root
+          key: ${{ secrets.SERVER_PRIVATE_KEY }} # 服务器私钥
+          port: ${{ secrets.SERVER_PORT }}       # SSH 端口，默认 22
+
+          # 要上传的文件：dist 目录下所有更新相关文件
+          source: "dist/*.exe,dist/*.blockmap,dist/latest*.yml"
+          # 上传到服务器的路径（自己改成你网站的目录）
+          target: "/www/wwwroot/bluetools/"
+          # 只上传文件，不创建额外目录
+          strip_components: 1

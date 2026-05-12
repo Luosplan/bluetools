@@ -1,8 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted, toRaw, onBeforeUnmount, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Delete, Refresh, Pointer } from '@element-plus/icons-vue'
 import { ElMessage as Toast } from 'element-plus'
 import jsQR from 'jsqr'
+const router = useRouter()
 // 导入pinia store
 import { useBluetoothStore } from '../../stores/bluetooth'
 // 导入蓝牙协议工具函数
@@ -88,16 +90,22 @@ const startTest = () => {
     Toast.info('请先录入设备')
     return
   }
-  
+  // 检查蓝牙状态
+  if (bluetoothStore.bluetoothState !== 'poweredOn') {
+    initBluetooth()
+    if (!bluetoothStore.checkBluetoothState()) return
+  }
   testStarted.value = true
   testCompleted.value = false
+  
+  // 先停止蓝牙扫描，释放资源
+  bluetoothStore.stopScan()
   
   // 使用pinia store设置测试队列
   bluetoothStore.setTestQueue(devices.value)
   
   // 跳转到测试页面
-  window.location.href = '#/test'
-  
+  router.push('/test')
   console.log('开始测试', devices.value)
 }
 
@@ -433,10 +441,10 @@ onBeforeUnmount(() => {
                         </div>
                         <span class="text-[10px] text-slate-500">{{ device.rssi }} dBm</span>
                       </div>
-                      <button
+                      <!-- <button
                         class="border-none px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded hover:bg-blue-500 hover:text-white transition" @click="addDeviceToQueue(device)">
                         添加
-                      </button>
+                      </button> -->
                     </div>
                   </div>
                 </div>
