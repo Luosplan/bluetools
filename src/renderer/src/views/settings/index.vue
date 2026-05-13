@@ -218,6 +218,7 @@ onMounted(() => {
   })
   
   window.ipcRenderer.on('update-not-available', (info) => {
+    console.log(info);
     updateStatus.checking = false
     ElMessage.success('当前已是最新版本')
   })
