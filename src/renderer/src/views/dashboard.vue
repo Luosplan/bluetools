@@ -19,8 +19,8 @@ const updateStatus = ref({
 })
 
 // 版本信息
-const appVersion = ref('1.0.0')
 const buildTime = ref('')
+import { appVersion } from '../../main/index.js'
 
 // 设置构建时间为当前日期（格式：YYYYMMDD）
 buildTime.value = new Date().toISOString().slice(0, 10).replace(/-/g, '')

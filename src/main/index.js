@@ -6,6 +6,7 @@ import EventRouter from './router/EventRouter'
 import routers from './router/router.template'
 import fs from 'fs'
 import { autoUpdater } from 'electron-updater'
+export const appVersion = app.getVersion()
 
 function createWindow() {
   // Create the browser window.
@@ -65,7 +66,6 @@ function createWindow() {
   // 读取package.json获取版本号
   const packageJson = require('../../package.json')
   // const appVersion = packageJson.version
-  const appVersion = app.getVersion()
 
   // 当页面加载完成后，发送版本号给渲染进程
   mainWindow.webContents.on('did-finish-load', () => {
