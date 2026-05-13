@@ -57,8 +57,7 @@ export const useUpdaterStore = defineStore('updater', {
         this.currentVersion = info.version
       })
 
-      // 默认值
-      this.currentVersion = '1.0.0'
+      // 等待主进程发送版本号
     },
 
     // 检查更新

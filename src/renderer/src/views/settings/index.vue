@@ -23,7 +23,7 @@ const settings = ref({
     nameFilters: ['ecv02']
   }
 })
-const appVersion = ref('1.0.0')
+const appVersion = ref('')
 // 应用版本和构建时间（实际应用中应该从环境变量或配置文件获取）
 const buildTime = new Date().toLocaleDateString()
 
@@ -166,6 +166,18 @@ onMounted(() => {
   
   // 初始化 updater store
   updaterStore.init()
+  
+  // 主动请求版本号
+  if (window.ipcRenderer.invoke) {
+    window.ipcRenderer.invoke('get-app-version').then(info => {
+      if (info && info.version) {
+        appVersion.value = info.version
+        updaterStore.currentVersion = info.version
+      }
+    }).catch(err => {
+      console.error('获取版本号失败:', err)
+    })
+  }
   
   // 监听更新事件
   // window.ipcRenderer.on('update-available', (info) => {

@@ -88,6 +88,11 @@ function createWindow() {
     return eventRouter.router(arg)
   })
 
+  // 监听渲染进程获取版本号的请求
+  ipcMain.handle('get-app-version', () => {
+    return { version: appVersion }
+  })
+
   // 监听渲染进程的检查更新请求
   ipcMain.on('check-for-updates', () => {
     console.log('收到检查更新请求')

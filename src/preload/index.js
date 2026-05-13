@@ -37,6 +37,13 @@ const api = {
       // Deliberately strip event as it includes `sender`
       ipcRenderer.once(channel, (event, ...args) => func(...args))
     }
+  },
+  // 获取应用版本号
+  invoke: (channel, ...args) => {
+    const validChannels = ['get-app-version']
+    if (validChannels.includes(channel)) {
+      return ipcRenderer.invoke(channel, ...args)
+    }
   }
 }
 

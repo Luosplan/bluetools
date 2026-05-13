@@ -20,7 +20,7 @@ const updateStatus = ref({
 
 // 版本信息
 const buildTime = ref('')
-const appVersion = ref('1.0.0')
+const appVersion = ref('')
 
 // 设置构建时间为当前日期（格式：YYYYMMDD）
 buildTime.value = new Date().toISOString().slice(0, 10).replace(/-/g, '')
@@ -311,6 +311,17 @@ const addDeviceToQueue = (device) => {
 onMounted(() => {
   // 组件挂载时初始化蓝牙
   initBluetooth()
+  
+  // 主动请求版本号
+  if (window.ipcRenderer.invoke) {
+    window.ipcRenderer.invoke('get-app-version').then(info => {
+      if (info && info.version) {
+        appVersion.value = info.version
+      }
+    }).catch(err => {
+      console.error('获取版本号失败:', err)
+    })
+  }
 })
 
 // 测试完成状态
