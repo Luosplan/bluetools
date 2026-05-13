@@ -36,13 +36,13 @@ export const useUpdaterStore = defineStore('updater', {
         this.error = null
       })
 
-      ipcRenderer.on('download-progress', (event, progress) => {
+      ipcRenderer.on('download-progress', (progress) => {
         if (!progress) return
         this.progress = progress.percent || 0
         this.isDownloading = true
       })
 
-      ipcRenderer.on('update-downloaded', (event, info) => {
+      ipcRenderer.on('update-downloaded', (info) => {
         if (!info) return
         this.isDownloading = false
         this.updateDownloaded = true

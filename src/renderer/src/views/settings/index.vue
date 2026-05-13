@@ -113,6 +113,10 @@ const checkForUpdates = () => {
 
 // 下载更新
 const downloadUpdate = () => {
+  updateStatus.downloading = true
+  updateStatus.progress = 0
+  updateStatus.error = null
+  
   updaterStore.downloadUpdate()
 }
 
@@ -188,10 +192,11 @@ onMounted(() => {
   //   ElMessage.info(`发现新版本: ${info.version}`)
   // })
   window.ipcRenderer.on('update-available', (info) => {
-    console.log(updateStatus);
+    console.log(info);
     updateStatus.checking = false
     updateStatus.available = true
     updateStatus.info = info
+    updateStatus.latestVersion = info.version || ''
   })
    window.ipcRenderer.on('download-progress', (progress) => {
     // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
