@@ -75,13 +75,13 @@ const downloadUpdate = () => {
 
 // 监听更新相关事件
 if (window.ipcRenderer) {
-  window.ipcRenderer.on('update-available', (event, info) => {
+  window.ipcRenderer.on('update-available', (info) => {
     updateStatus.value.checking = false
     updateStatus.value.available = true
     updateStatus.value.info = info
   })
 
-  window.ipcRenderer.on('download-progress', (event, progress) => {
+  window.ipcRenderer.on('download-progress', (progress) => {
     // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
     const newProgress = Math.round(progress.percent)
     if (newProgress > updateStatus.value.progress) {
@@ -93,13 +93,13 @@ if (window.ipcRenderer) {
     }
   })
 
-  window.ipcRenderer.on('update-downloaded', (event, info) => {
+  window.ipcRenderer.on('update-downloaded', (info) => {
     updateStatus.value.downloading = false
     updateStatus.value.available = false
     updateStatus.value.progress = 0 // 更新完成后进度归零
   })
 
-  window.ipcRenderer.on('update-error', (event, error) => {
+  window.ipcRenderer.on('update-error', (error) => {
     updateStatus.value.checking = false
     updateStatus.value.downloading = false
     updateStatus.value.progress = 0 // 更新失败时进度归零
@@ -107,7 +107,7 @@ if (window.ipcRenderer) {
   })
 
   // 监听没有更新的情况
-  window.ipcRenderer.on('update-not-available', (event, info) => {
+  window.ipcRenderer.on('update-not-available', (info) => {
     updateStatus.value.checking = false
     // 提示用户暂无新版本
     Toast.info('暂无新版本')

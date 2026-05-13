@@ -26,7 +26,7 @@ export const useUpdaterStore = defineStore('updater', {
     // 初始化更新器
     init() {
       // 监听主进程的更新事件
-      ipcRenderer.on('update-available', (event, info) => {
+      ipcRenderer.on('update-available', (info) => {
         console.log(info);
         if (!info) return
         this.updateAvailable = true
@@ -49,7 +49,7 @@ export const useUpdaterStore = defineStore('updater', {
         this.latestVersion = info.version || ''
       })
 
-      ipcRenderer.on('update-error', (event, error) => {
+      ipcRenderer.on('update-error', (error) => {
         this.isChecking = false
         this.isDownloading = false
         this.error = error || null
