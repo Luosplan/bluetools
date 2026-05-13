@@ -3,10 +3,12 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 // 导入pinia store
 import { useSettingsStore } from '../../stores/settings'
+import { useUpdaterStore } from '../../stores/updater'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 使用pinia store
 const settingsStore = useSettingsStore()
+const updaterStore = useUpdaterStore()
 
 // 获取当前设置数据
 const settings = ref({
@@ -31,7 +33,8 @@ const updateStatus = reactive({
   downloading: false,
   progress: 0,
   available: false,
-  error: null
+  error: null,
+  latestVersion: ''
 })
 
 // 保存设置
@@ -100,11 +103,22 @@ const loadSettings = () => {
 const checkForUpdates = () => {
   updateStatus.checking = true
   updateStatus.error = null
+  updateStatus.available = false
+  updateStatus.downloading = false
+  updateStatus.progress = 0
   
-  // 模拟检查更新
-  setTimeout(() => {
-    updateStatus.checking = false
-  }, 1500)
+  // 调用 updater store 的检查更新方法
+  updaterStore.checkForUpdates()
+}
+
+// 下载更新
+const downloadUpdate = () => {
+  updaterStore.downloadUpdate()
+}
+
+// 安装更新
+const installUpdate = () => {
+  updaterStore.installUpdate()
 }
 
 // 添加过滤名称
@@ -149,11 +163,58 @@ const clearSettings = () => {
 // 组件挂载时加载设置
 onMounted(() => {
   loadSettings()
+  
+  // 初始化 updater store
+  updaterStore.init()
+  
+  // 获取当前版本号
+  appVersion.value = updaterStore.currentVersion || '1.0.0'
+  
+  // 监听更新事件
+  window.ipcRenderer.on('update-available', (info) => {
+    updateStatus.checking = false
+    updateStatus.available = true
+    updateStatus.latestVersion = info.version
+    updateStatus.error = null
+    ElMessage.info(`发现新版本: ${info.version}`)
+  })
+  
+  window.ipcRenderer.on('download-progress', (progress) => {
+    updateStatus.downloading = true
+    updateStatus.progress = progress.percent || 0
+  })
+  
+  window.ipcRenderer.on('update-downloaded', (info) => {
+    updateStatus.downloading = false
+    updateStatus.progress = 100
+    ElMessage.success('更新已下载完成')
+  })
+  
+  window.ipcRenderer.on('update-error', (error) => {
+    updateStatus.checking = false
+    updateStatus.downloading = false
+    updateStatus.error = error.message || error
+    ElMessage.error(`更新失败: ${updateStatus.error}`)
+  })
+  
+  window.ipcRenderer.on('update-not-available', (info) => {
+    updateStatus.checking = false
+    ElMessage.success('当前已是最新版本')
+  })
 })
 
 // 组件卸载时保存设置
 onUnmounted(() => {
   saveSettings()
+  // 清理 updater store 事件监听器
+  updaterStore.cleanup()
+  
+  // 清理当前组件的事件监听器
+  window.ipcRenderer.removeAllListeners('update-available')
+  window.ipcRenderer.removeAllListeners('download-progress')
+  window.ipcRenderer.removeAllListeners('update-downloaded')
+  window.ipcRenderer.removeAllListeners('update-error')
+  window.ipcRenderer.removeAllListeners('update-not-available')
 })
 </script>
 
@@ -238,6 +299,17 @@ onUnmounted(() => {
                 :style="{ width: `${updateStatus.progress}%` }"
               ></div>
             </div>
+          </div>
+          
+          <!-- 新版本可用提示 -->
+          <div v-if="updateStatus.available && !updateStatus.downloading" class="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-md">
+            <div class="text-xs text-blue-400">发现新版本: {{ updateStatus.latestVersion }}</div>
+            <button 
+              class="mt-2 border-none px-4 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-md transition"
+              @click="downloadUpdate"
+            >
+              下载更新
+            </button>
           </div>
           
           <div class="flex items-center justify-between p-2">

@@ -42,12 +42,9 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: github
-  owner: Luosplan  # 请替换为你的GitHub用户名
-  repo: bluetools
-  vPrefixedTagName: true
-  releaseType: release
+  provider: generic
+  url: https://electron-updater.426cnip.com/
   # publishAutoUpdate: false  # 关闭后无法生成 latest.yml
-  publishAutoUpdate: true  # 需要开启配置
+  publishAutoUpdate: true
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
