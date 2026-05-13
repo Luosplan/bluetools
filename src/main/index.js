@@ -64,7 +64,8 @@ function createWindow() {
 
   // 读取package.json获取版本号
   const packageJson = require('../../package.json')
-  const appVersion = packageJson.version
+  // const appVersion = packageJson.version
+  const appVersion = app.getVersion()
 
   // 当页面加载完成后，发送版本号给渲染进程
   mainWindow.webContents.on('did-finish-load', () => {
@@ -98,7 +99,7 @@ function createWindow() {
         // 模拟 2 秒后收到没有可用更新的事件
         setTimeout(() => {
           mainWindow.webContents.send('update-not-available', {
-            version: appVersion
+            version: app.getVersion() // 这里修复
           })
         }, 2000)
       }
