@@ -200,9 +200,11 @@ onMounted(() => {
   })
   
   // 监听 app-version 事件来获取当前版本号
-  window.ipcRenderer.on('app-version', (info) => {
-    appVersion.value = info.version
-    updaterStore.currentVersion = info.version
+  window.ipcRenderer.on('app-version', (event, info) => {
+    if (info && info.version) {
+      appVersion.value = info.version
+      updaterStore.currentVersion = info.version
+    }
   })
 })
 
