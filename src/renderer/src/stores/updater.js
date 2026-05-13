@@ -27,34 +27,39 @@ export const useUpdaterStore = defineStore('updater', {
     init() {
       // 监听主进程的更新事件
       ipcRenderer.on('update-available', (event, info) => {
+        console.log(info);
+        if (!info) return
         this.updateAvailable = true
-        this.latestVersion = info.version
+        this.latestVersion = info.version || ''
         this.releaseNotes = info.releaseNotes || ''
         this.releaseDate = info.releaseDate ? new Date(info.releaseDate) : null
         this.error = null
       })
 
       ipcRenderer.on('download-progress', (event, progress) => {
+        if (!progress) return
         this.progress = progress.percent || 0
         this.isDownloading = true
       })
 
       ipcRenderer.on('update-downloaded', (event, info) => {
+        if (!info) return
         this.isDownloading = false
         this.updateDownloaded = true
-        this.latestVersion = info.version
+        this.latestVersion = info.version || ''
       })
 
       ipcRenderer.on('update-error', (event, error) => {
         this.isChecking = false
         this.isDownloading = false
-        this.error = error
+        this.error = error || null
         this.updateAvailable = false
       })
 
       // 监听主进程发送的 app-version 事件来获取当前版本
       ipcRenderer.on('app-version', (event, info) => {
-        this.currentVersion = info.version
+        if (!info) return
+        this.currentVersion = info.version || ''
       })
 
       // 等待主进程发送版本号
