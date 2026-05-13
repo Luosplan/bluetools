@@ -21,7 +21,7 @@ const settings = ref({
     nameFilters: ['ecv02']
   }
 })
-import { appVersion } from '../../main/index.js'
+const appVersion = ref('1.0.0')
 // 应用版本和构建时间（实际应用中应该从环境变量或配置文件获取）
 const buildTime = new Date().toLocaleDateString()
 
