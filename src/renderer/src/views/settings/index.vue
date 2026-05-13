@@ -188,6 +188,7 @@ onMounted(() => {
   //   ElMessage.info(`发现新版本: ${info.version}`)
   // })
   window.ipcRenderer.on('update-available', (info) => {
+    console.log(updateStatus);
     updateStatus.checking = false
     updateStatus.available = true
     updateStatus.info = info
