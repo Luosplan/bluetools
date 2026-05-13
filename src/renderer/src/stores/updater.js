@@ -52,8 +52,13 @@ export const useUpdaterStore = defineStore('updater', {
         this.updateAvailable = false
       })
 
-      // 获取当前应用版本
-      this.currentVersion = process.env.npm_package_version || '1.0.0'
+      // 监听主进程发送的 app-version 事件来获取当前版本
+      ipcRenderer.on('app-version', (event, info) => {
+        this.currentVersion = info.version
+      })
+
+      // 默认值
+      this.currentVersion = '1.0.0'
     },
 
     // 检查更新
@@ -111,6 +116,7 @@ export const useUpdaterStore = defineStore('updater', {
       ipcRenderer.removeAllListeners('download-progress')
       ipcRenderer.removeAllListeners('update-downloaded')
       ipcRenderer.removeAllListeners('update-error')
+      ipcRenderer.removeAllListeners('app-version')
     }
   }
 })

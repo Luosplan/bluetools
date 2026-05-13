@@ -167,9 +167,6 @@ onMounted(() => {
   // 初始化 updater store
   updaterStore.init()
   
-  // 获取当前版本号
-  appVersion.value = updaterStore.currentVersion || '1.0.0'
-  
   // 监听更新事件
   window.ipcRenderer.on('update-available', (info) => {
     updateStatus.checking = false
@@ -201,6 +198,12 @@ onMounted(() => {
     updateStatus.checking = false
     ElMessage.success('当前已是最新版本')
   })
+  
+  // 监听 app-version 事件来获取当前版本号
+  window.ipcRenderer.on('app-version', (info) => {
+    appVersion.value = info.version
+    updaterStore.currentVersion = info.version
+  })
 })
 
 // 组件卸载时保存设置
@@ -215,6 +218,7 @@ onUnmounted(() => {
   window.ipcRenderer.removeAllListeners('update-downloaded')
   window.ipcRenderer.removeAllListeners('update-error')
   window.ipcRenderer.removeAllListeners('update-not-available')
+  window.ipcRenderer.removeAllListeners('app-version')
 })
 </script>
 
