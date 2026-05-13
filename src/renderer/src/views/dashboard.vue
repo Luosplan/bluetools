@@ -81,7 +81,7 @@ if (window.ipcRenderer) {
     updateStatus.value.info = info
   })
 
-  window.ipcRenderer.on('download-progress', (progress) => {
+  window.ipcRenderer.on('download-progress', (event, progress) => {
     // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
     const newProgress = Math.round(progress.percent)
     if (newProgress > updateStatus.value.progress) {
@@ -93,13 +93,13 @@ if (window.ipcRenderer) {
     }
   })
 
-  window.ipcRenderer.on('update-downloaded', (info) => {
+  window.ipcRenderer.on('update-downloaded', (event, info) => {
     updateStatus.value.downloading = false
     updateStatus.value.available = false
     updateStatus.value.progress = 0 // 更新完成后进度归零
   })
 
-  window.ipcRenderer.on('update-error', (error) => {
+  window.ipcRenderer.on('update-error', (event, error) => {
     updateStatus.value.checking = false
     updateStatus.value.downloading = false
     updateStatus.value.progress = 0 // 更新失败时进度归零
@@ -107,15 +107,17 @@ if (window.ipcRenderer) {
   })
 
   // 监听没有更新的情况
-  window.ipcRenderer.on('update-not-available', (info) => {
+  window.ipcRenderer.on('update-not-available', (event, info) => {
     updateStatus.value.checking = false
     // 提示用户暂无新版本
     Toast.info('暂无新版本')
   })
 
   // 监听应用版本信息
-  window.ipcRenderer.on('app-version', (info) => {
-    appVersion.value = info.version
+  window.ipcRenderer.on('app-version', (event, info) => {
+    if (info && info.version) {
+      appVersion.value = info.version
+    }
   })
 }
 
