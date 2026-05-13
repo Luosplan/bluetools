@@ -37,8 +37,8 @@ export const useUpdaterStore = defineStore('updater', {
       })
 
       ipcRenderer.on('download-progress', (progress) => {
-        if (!progress) return
-        this.progress = progress.percent || 0
+        if (!progress || typeof progress.percent !== 'number') return
+        this.progress = Math.min(progress.percent || 0, 100)
         this.isDownloading = true
       })
 

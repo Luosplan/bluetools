@@ -200,6 +200,8 @@ onMounted(() => {
   })
    window.ipcRenderer.on('download-progress', (progress) => {
     // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
+    if (!progress || typeof progress.percent !== 'number') return
+    
     const newProgress = Math.round(progress.percent)
     if (newProgress > updateStatus.progress) {
       updateStatus.progress = newProgress
