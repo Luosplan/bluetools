@@ -178,14 +178,14 @@ function setupAutoUpdater() {
   // 服务器上需要放置: latest.yml, *.exe, *.blockmap 文件
   autoUpdater.setFeedURL({
     provider: 'generic',
-    url: 'http://8.136.42.240/'
+    url: 'https://electron-updater.426cnip.com/'
   })
 
   // 打印初始配置信息
   console.log('[autoUpdater] 初始化完成，当前版本:', app.getVersion())
   console.log('[autoUpdater] 更新服务器配置:', {
     provider: 'generic',
-    url: 'http://8.136.42.240/'
+    url: 'https://electron-updater.426cnip.com/'
   })
 
   // 监听更新检查开始
@@ -259,8 +259,6 @@ function setupAutoUpdater() {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.commandLine.appendSwitch('ignore-certificate-errors')
-app.commandLine.appendSwitch('disable-web-security')
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
