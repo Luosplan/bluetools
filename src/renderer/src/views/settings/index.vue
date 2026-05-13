@@ -168,14 +168,18 @@ onMounted(() => {
   updaterStore.init()
   
   // 监听更新事件
-  window.ipcRenderer.on('update-available', (info) => {
-    updateStatus.checking = false
-    updateStatus.available = true
-    updateStatus.latestVersion = info.version
-    updateStatus.error = null
-    ElMessage.info(`发现新版本: ${info.version}`)
+  // window.ipcRenderer.on('update-available', (info) => {
+  //   updateStatus.checking = false
+  //   updateStatus.available = true
+  //   updateStatus.latestVersion = info.version
+  //   updateStatus.error = null
+  //   ElMessage.info(`发现新版本: ${info.version}`)
+  // })
+  window.ipcRenderer.on('update-available', (event, info) => {
+    updateStatus.value.checking = false
+    updateStatus.value.available = true
+    updateStatus.value.info = info
   })
-  
    window.ipcRenderer.on('download-progress', (event, progress) => {
     // 确保进度值只增不减，避免因网络波动或总大小重新计算导致的进度条回退
     const newProgress = Math.round(progress.percent)
