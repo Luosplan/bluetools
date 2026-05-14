@@ -1,6 +1,6 @@
 {
   "name": "bluetools",
-  "version": "1.2.14",
+  "version": "1.3.0",
   "description": "An Electron application with Vue",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -11,6 +11,7 @@
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "upload": "node upload.js",
     "postinstall": "electron-builder install-app-deps",
     "clean:dist": "if exist dist rd /s /q dist",
     "build:unpack": "npm run clean:dist && npm run build && electron-builder --dir",
